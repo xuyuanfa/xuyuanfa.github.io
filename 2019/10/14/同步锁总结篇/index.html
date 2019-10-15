@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next gemini use-motion" lang="zh-Hans">
+<head><meta name="generator" content="Hexo 3.9.0">
+  <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform">
+<meta http-equiv="Cache-Control" content="no-siteapp">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css">
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css">
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Hexo, NexT">
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="自旋锁 synchronized内置锁 volatile原子变量 ReentrantLock ReentrantReadWriteLock AbstractQueuedSynchronizer JUC同步辅助类 LockSupport">
+<meta property="og:type" content="article">
+<meta property="og:title" content="同步锁总结篇">
+<meta property="og:url" content="http://yoursite.com/2019/10/14/同步锁总结篇/index.html">
+<meta property="og:site_name" content="残酷月光">
+<meta property="og:description" content="自旋锁 synchronized内置锁 volatile原子变量 ReentrantLock ReentrantReadWriteLock AbstractQueuedSynchronizer JUC同步辅助类 LockSupport">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2019-10-15T09:14:45.357Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="同步锁总结篇">
+<meta name="twitter:description" content="自旋锁 synchronized内置锁 volatile原子变量 ReentrantLock ReentrantReadWriteLock AbstractQueuedSynchronizer JUC同步辅助类 LockSupport">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Gemini',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/10/14/同步锁总结篇/">
+
+
+
+
+
+  <title>同步锁总结篇 | 残酷月光</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/" class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">残酷月光</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">没有梦想，何必远方</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br>
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br>
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br>
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br>
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br>
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup search-popup local-search-popup">
+  <div class="local-search-header clearfix">
+    <span class="search-icon">
+      <i class="fa fa-search"></i>
+    </span>
+    <span class="popup-btn-close">
+      <i class="fa fa-times-circle"></i>
+    </span>
+    <div class="local-search-input-wrapper">
+      <input autocomplete="off" placeholder="搜索..." spellcheck="false" type="text" id="local-search-input">
+    </div>
+  </div>
+  <div id="local-search-result"></div>
+</div>
+
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/14/同步锁总结篇/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="xuyuanfa">
+      <meta itemprop="description" content>
+      <meta itemprop="image" content="/images/head.jpg">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="残酷月光">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">同步锁总结篇</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-14T20:50:23+08:00">
+                2019-10-14
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2019/10/14/同步锁总结篇/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2019/10/14/同步锁总结篇/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <ul>
+<li><a href="##1">自旋锁</a></li>
+<li><a href="##2">synchronized内置锁</a></li>
+<li><a href="##3">volatile原子变量</a></li>
+<li><a href="##4">ReentrantLock</a></li>
+<li><a href="##5">ReentrantReadWriteLock</a></li>
+<li><a href="##6">AbstractQueuedSynchronizer</a></li>
+<li><a href="##7">JUC同步辅助类</a></li>
+<li><a href="##8">LockSupport</a><a id="more"></a>
+
+
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="自旋锁"><a href="#自旋锁" class="headerlink" title="自旋锁"></a>自旋锁</h3><ul>
+<li>自旋锁是指当一个线程尝试获取某个锁时，如果该锁已被其他线程占用，就一直循环检测锁是否被释放，而不是进入线程挂起或睡眠状态。</li>
+<li>自旋锁适用于锁保护的临界区很小的情况，临界区很小的话，锁占用的时间就很短。</li>
+<li>自旋锁（Spin lock）、排队自旋锁（TargetLock）、MCS锁（MCSLock）、CLH锁（CLHLock）</li>
+</ul>
+<p><strong>简单自旋锁</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">public class SpinLock &#123;</span><br><span class="line">    private AtomicReference&lt;Thread&gt; owner = new AtomicReference&lt;Thread&gt;();</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        Thread currentThread = Thread.currentThread();</span><br><span class="line">        // 如果锁未被占用，则设置当前线程为锁的拥有者</span><br><span class="line">        while (!owner.compareAndSet(null, currentThread)) &#123;&#125;</span><br><span class="line">    &#125;</span><br><span class="line">    public void unlock() &#123;</span><br><span class="line">        Thread currentThread = Thread.currentThread();</span><br><span class="line">        // 只有锁的拥有者才能释放锁</span><br><span class="line">        owner.compareAndSet(currentThread, null);&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>缺点：</p>
+<ul>
+<li>CAS操作需要硬件的配合；</li>
+<li>保证各个CPU的缓存（L1、L2、L3、跨CPU Socket、主存）的数据一致性，通讯开销很大，在多处理器系统上更严重；</li>
+<li>没法保证公平性，不保证等待进程/线程按照FIFO顺序获得锁。</li>
+</ul>
+<p><strong>排队自旋锁</strong><br>有序的公平锁。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">public class TicketLock &#123;</span><br><span class="line">    private AtomicInteger serviceNum = new AtomicInteger();</span><br><span class="line">    private AtomicInteger ticketNum = new AtomicInteger();</span><br><span class="line">    private static final ThreadLocal&lt;Integer&gt; LOCAL = new ThreadLocal&lt;Integer&gt;();</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        int myticket = ticketNum.getAndIncrement();</span><br><span class="line">        LOCAL.set(myticket);</span><br><span class="line">        while (myticket != serviceNum.get()) &#123;&#125;</span><br><span class="line">    &#125;</span><br><span class="line">    public void unlock() &#123;</span><br><span class="line">        int myticket = LOCAL.get();</span><br><span class="line">        if (myticket == null) </span><br><span class="line">            return;</span><br><span class="line">        serviceNum.compareAndSet(myticket, myticket + 1);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>缺点：</p>
+<ul>
+<li>Ticket Lock 虽然解决了公平性的问题，但是多处理器系统上，每个进程/线程占用的处理器都在读写同一个变量serviceNum ，每次读写操作都必须在多个处理器缓存之间进行缓存同步，这会导致繁重的系统总线和内存的流量，大大降低系统整体的性能。</li>
+</ul>
+<p><strong>MCS锁</strong><br>MCS Spinlock 是一种基于链表的可扩展、高性能、公平的自旋锁，申请线程只在本地变量上自旋，直接前驱负责通知其结束自旋，从而极大地减少了不必要的处理器缓存同步的次数，降低了总线和内存的开销。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">public class MCSLock &#123;</span><br><span class="line">    public static class MCSNode &#123;</span><br><span class="line">        volatile MCSNode next;</span><br><span class="line">        volatile boolean isLocked = true;</span><br><span class="line">    &#125;</span><br><span class="line">    private static final ThreadLocal&lt;MCSNode&gt; NODE = new ThreadLocal&lt;MCSNode&gt;();</span><br><span class="line">    @SuppressWarnings(&quot;unused&quot;)</span><br><span class="line">    private volatile MCSNode queue;</span><br><span class="line">    private static final AtomicReferenceFieldUpdater&lt;MCSLock, MCSNode&gt; UPDATER = </span><br><span class="line">        AtomicReferenceFieldUpdater.newUpdater(MCSLock.class, MCSNode.class, &quot;queue&quot;);</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        MCSNode currentNode = new MCSNode();</span><br><span class="line">        NODE.set(currentNode);</span><br><span class="line">        MCSNode preNode = UPDATER.getAndSet(this, currentNode);</span><br><span class="line">        if (preNode != null) &#123;</span><br><span class="line">            preNode.next = currentNode;</span><br><span class="line">            while (currentNode.isLocked) &#123;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    public void unlock() &#123;</span><br><span class="line">        MCSNode currentNode = NODE.get();</span><br><span class="line">        if (currentNode.next == null) &#123;</span><br><span class="line">            if (UPDATER.compareAndSet(this, currentNode, null)) &#123;</span><br><span class="line">                // compareAndSet返回true表示确实没有人排在自己后面</span><br><span class="line">                return;</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                // 在修改</span><br><span class="line">                while (currentNode.next == null) &#123;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        currentNode.next.isLocked = false;</span><br><span class="line">        currentNode.next = null;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>CLH锁</strong><br>CLH锁也是一种基于链表的可扩展、高性能、公平的自旋锁，申请线程只在本地变量上自旋，它不断轮询前驱的状态，如果发现前驱释放了锁就结束自旋。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">public class CLHLock &#123;</span><br><span class="line">    public static class CLHNode &#123;</span><br><span class="line">        private volatile boolean isLocked = true;</span><br><span class="line">    &#125;</span><br><span class="line">    @SuppressWarnings(&quot;unused&quot;)</span><br><span class="line">    private volatile CLHNode tail;</span><br><span class="line">    private static final ThreadLocal&lt;CLHNode&gt; LOCAL = new ThreadLocal&lt;CLHNode&gt;();</span><br><span class="line">    private static final AtomicReferenceFieldUpdater&lt;CLHLock, CLHNode&gt; UPDATER = AtomicReferenceFieldUpdater</span><br><span class="line">            .newUpdater(CLHLock.class, CLHNode.class, &quot;tail&quot;);</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        CLHNode node = new CLHNode();</span><br><span class="line">        LOCAL.set(node);</span><br><span class="line">        CLHNode preNode = UPDATER.getAndSet(this, node);</span><br><span class="line">        if (preNode != null) &#123;</span><br><span class="line">            while (preNode.isLocked) &#123;</span><br><span class="line">            &#125;</span><br><span class="line">            preNode = null;</span><br><span class="line">            LOCAL.set(node);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    public void unlock() &#123;</span><br><span class="line">        CLHNode node = LOCAL.get();</span><br><span class="line">        if (!UPDATER.compareAndSet(this, node, null)) &#123;</span><br><span class="line">            node.isLocked = false;</span><br><span class="line">        &#125;</span><br><span class="line">        node = null;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>缺点：</p>
+<ul>
+<li>CLHlock是不停的查询前驱变量， 导致不适合在NUMA 架构下使用（在这种结构下，每个线程分布在不同的物理内存区域）</li>
+</ul>
+<p><strong>NUMA架构简介</strong><br>由于所有CPU Core都是通过共享一个北桥来读取内存，随着核数不断的发展，北桥在响应时间上的性能瓶颈越来越明显。于是，聪明的硬件设计师们，先到了把内存控制器（原本北桥中读取内存的部分）也做个拆分，平分到了每个die上。于是NUMA就出现了！<br><a href="http://cenalulu.github.io/linux/numa/" target="_blank" rel="noopener">http://cenalulu.github.io/linux/numa/</a></p>
+<p><span id="#2"></span></p>
+<h3 id="synchronized内置锁"><a href="#synchronized内置锁" class="headerlink" title="synchronized内置锁"></a>synchronized内置锁</h3><ol>
+<li>作为修饰符加在方法声明上, synchronized修饰非静态方法时表示锁住了调用该方法的堆对象（相对于synchronized(this)）, 修饰静态方法时表示锁住了这个类在方法区中的类对象（相对于synchronized(X.class)）；</li>
+<li>synchronized(X.class) 使用类对象作为monitor. 同一时间只有一个线程可以能访问块中资源</li>
+<li>synchronized(this)和synchronized(mutex) 都是对象锁, 同一时间每个实例都保证只能有一个实例能访问块中资源；<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">public class SyncMethod &#123;</span><br><span class="line">    private int value = 0;</span><br><span class="line">    private final Object mutex = new Object();</span><br><span class="line"></span><br><span class="line">    public synchronized int incAndGet0() &#123;</span><br><span class="line">       return ++value;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public int incAndGet1() &#123;</span><br><span class="line">        synchronized(this)&#123;</span><br><span class="line">            return ++value;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public int incAndGet2() &#123;</span><br><span class="line">       synchronized(SyncMethod.class)&#123;</span><br><span class="line">            return ++value;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public int incAndGet3() &#123;</span><br><span class="line">       synchronized(mutex)&#123;</span><br><span class="line">            return ++value;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public static synchonrize int incAndGet4() &#123;</span><br><span class="line">       synchronized(mutex)&#123;</span><br><span class="line">            return ++value;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+</ol>
+<p><span id="#3"></span></p>
+<h3 id="volatile原子变量"><a href="#volatile原子变量" class="headerlink" title="volatile原子变量"></a>volatile原子变量</h3><p>synchronized的代码块是确保可见性和原子性的，volatile只能确保可见性。<br>当且仅当下面条件全部满足时, 才能使用volatile保证原子性：</p>
+<ul>
+<li>对变量的写入操作不依赖于变量的当前值，或者能确保只有单个线程在更新</li>
+<li>该变量不会与其他状态变量共同参与不变性条件中</li>
+</ul>
+<p><strong>volatile两个语义</strong><br>a.保证此变量对所有线程的可见性；<br>b.禁止指令重排序优化；</p>
+<ul>
+<li>保证原子性的规则<br>a.运算结果并不依赖变量的当前值，或者能够确保只有单一的线程修改变量的值；<br>b.变量不需要与其他的状态变量共同参与不变约束；</li>
+<li>可见性指令实现<br>lock addl $0x0,(%esp)<br>addl $0x0,(%esp)把ESP寄存器的值加0；<br>lock前缀使本CPU的cache写入内存，该写入动作会引起别的CPU或内核无效化其cache；<br>通过这样的空操作，让volatile变量的修改对其他CPU立即可见。</li>
+<li>指令重排序<br>是指CPU采用了允许将多条指令不按程序规定的顺序分开发送给各相应的电路单元处理；<br>lock addl $0x0,(%esp)指令把修改同步到内存时，所有之前的操作都已经执行完成，实现内存屏障的效果。</li>
+</ul>
+<p><span id="#4"></span></p>
+<h3 id="ReentrantLock"><a href="#ReentrantLock" class="headerlink" title="ReentrantLock"></a>ReentrantLock</h3><ul>
+<li>ReentrantLock基于AbstractQueuedSynchronizer实现，并基于内部抽象类Sync实现了公平锁FairSync和非公平锁NonfairSync，默认非公平锁。</li>
+<li>高级功能：等待可中断、公平锁、锁绑定多个条件。</li>
+<li>性能因素，虚拟机在未来性能改进更加偏向于原生的synchronized，提倡优先考虑synchronized。</li>
+</ul>
+<p><strong>Condition</strong></p>
+<ul>
+<li>Condition是被绑定到Lock上的，要创建一个Lock的Condition必须用newCondition()方法。</li>
+<li>锁绑定多个条件，只需多次调用newCondition()方法。</li>
+<li>Condition的实例对象相对于Synchronized锁定的Object对象，可指定时间。<ul>
+<li>await()对应wait()</li>
+<li>signal()对应notify()</li>
+<li>signalAll()对应notifyAll()</li>
+</ul>
+</li>
+</ul>
+<p><span id="#5"></span></p>
+<h3 id="ReentrantReadWriteLock"><a href="#ReentrantReadWriteLock" class="headerlink" title="ReentrantReadWriteLock"></a>ReentrantReadWriteLock</h3><p>可重入的读写锁。<br>基于AQS实现，利用锁状态state实现读写锁：</p>
+<ol>
+<li>以锁状态state的高16位保存读锁状态，低16位保存写锁状态；</li>
+<li>读锁是共享锁，读读不互斥，高16位保存读锁获取数，当低16位大于0且不是当前线程时，存在写锁互斥；</li>
+</ol>
+<p>源码分析:<br>读锁</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">public static class ReadLock implements Lock, java.io.Serializable  &#123;</span><br><span class="line">    private final Sync sync;</span><br><span class="line">    protected ReadLock(ReentrantReadWriteLock lock) &#123;</span><br><span class="line">        sync = lock.sync;</span><br><span class="line">    &#125;</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        sync.acquireShared(1);//共享锁</span><br><span class="line">    &#125;</span><br><span class="line">    public void lockInterruptibly() throws InterruptedException &#123;</span><br><span class="line">        sync.acquireSharedInterruptibly(1);</span><br><span class="line">    &#125;</span><br><span class="line">    public  boolean tryLock() &#123;</span><br><span class="line">        return sync.tryReadLock();</span><br><span class="line">    &#125;</span><br><span class="line">    public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException &#123;</span><br><span class="line">        return sync.tryAcquireSharedNanos(1, unit.toNanos(timeout));</span><br><span class="line">    &#125;</span><br><span class="line">    public  void unlock() &#123;</span><br><span class="line">        sync.releaseShared(1);</span><br><span class="line">    &#125;</span><br><span class="line">    public Condition newCondition() &#123;</span><br><span class="line">        throw new UnsupportedOperationException();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>写锁</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">public static class WriteLock implements Lock, java.io.Serializable  &#123;</span><br><span class="line">    private final Sync sync;</span><br><span class="line">    protected WriteLock(ReentrantReadWriteLock lock) &#123;</span><br><span class="line">        sync = lock.sync;</span><br><span class="line">    &#125;</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        sync.acquire(1);//独占锁</span><br><span class="line">    &#125;</span><br><span class="line">    public void lockInterruptibly() throws InterruptedException &#123;</span><br><span class="line">        sync.acquireInterruptibly(1);</span><br><span class="line">    &#125;</span><br><span class="line">    public boolean tryLock( ) &#123;</span><br><span class="line">        return sync.tryWriteLock();</span><br><span class="line">    &#125;</span><br><span class="line">    public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException &#123;</span><br><span class="line">        return sync.tryAcquireNanos(1, unit.toNanos(timeout));</span><br><span class="line">    &#125;</span><br><span class="line">    public void unlock() &#123;</span><br><span class="line">        sync.release(1);</span><br><span class="line">    &#125;</span><br><span class="line">    public Condition newCondition() &#123;</span><br><span class="line">        return sync.newCondition();</span><br><span class="line">    &#125;</span><br><span class="line">    public boolean isHeldByCurrentThread() &#123;</span><br><span class="line">        return sync.isHeldExclusively();</span><br><span class="line">    &#125;</span><br><span class="line">    public int getHoldCount() &#123;</span><br><span class="line">        return sync.getWriteHoldCount();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>WriteLock是独占锁，和ReentrantLock里面的实现几乎相同，都是使用了AQS的acquire/release操作，锁状态state的使用不同。</li>
+<li>ReadLock是共享锁，当WriteLock有锁（锁状态state低16位大于0）发生读写互斥。</li>
+<li>AQS中的锁状态state字段（int类型，32位）用来描述有多少线程获持有锁。高位16位表示共享锁的数量，低位16位表示独占锁的数量（或者重入数量）。2^16-1=65536，所以共享锁和独占锁的数量最大只能是65535。</li>
+</ul>
+<p>写入锁分析:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">protected final boolean tryAcquire(int acquires) &#123;</span><br><span class="line">    Thread current = Thread.currentThread();</span><br><span class="line">    int c = getState();</span><br><span class="line">    int w = exclusiveCount(c);</span><br><span class="line">    if (c != 0) &#123;</span><br><span class="line">        // (Note: if c != 0 and w == 0 then shared count != 0)</span><br><span class="line">        if (w == 0 || current != getExclusiveOwnerThread())</span><br><span class="line">            return false;</span><br><span class="line">        if (w + exclusiveCount(acquires) &gt; MAX_COUNT)</span><br><span class="line">            throw new Error(&quot;Maximum lock count exceeded&quot;);</span><br><span class="line">        // Reentrant acquire</span><br><span class="line">        setState(c + acquires);</span><br><span class="line">        return true;</span><br><span class="line">    &#125;</span><br><span class="line">    if (writerShouldBlock() ||</span><br><span class="line">        !compareAndSetState(c, c + acquires))</span><br><span class="line">        return false;</span><br><span class="line">    setExclusiveOwnerThread(current);</span><br><span class="line">    return true;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>该方法是写锁调用的获取独占锁方法。</li>
+<li>锁状态不为0，写锁为0（此时存在读锁）或者独占锁持有线程不是当前线程，即会发生读写互斥返回false，或者写入锁的数量（重入数）大于65535就抛出一个Error异常。</li>
+<li>锁状态为0，可能是锁刚好被释放而为0，如果读写锁是公平锁时，需要判断链表中是否有正在排队的线程节点，有则需要排队返回false；如果被其他线程抢先获取写锁则CAS失败返回false。</li>
+<li>设置独占线程（写线程）为当前线程，返回true。</li>
+</ul>
+<p><strong>读写锁特性</strong></p>
+<ul>
+<li>重入性：读写锁允许同个线程按照请求锁的顺序重新获取读取锁或者写入锁。同个线程获取写入锁后可以再次获取读取锁，但获取读取锁后却不能获取写入锁。</li>
+<li>锁降级：线程获取写入锁后可以获取读取锁，然后释放写入锁，这样就从写入锁变成了读取锁，从而实现锁降级的特性。</li>
+<li>锁获取中断：读取锁和写入锁都支持获取锁期间被中断。这个和独占锁一致。</li>
+<li>条件变量：写入锁提供了条件变量(Condition)的支持，这个和独占锁一致，但是读取锁却不允许获取条件变量，将得到一个UnsupportedOperationException异常。</li>
+</ul>
+<p><span id="#6"></span></p>
+<h3 id="AbstractQueuedSynchronizer"><a href="#AbstractQueuedSynchronizer" class="headerlink" title="AbstractQueuedSynchronizer"></a>AbstractQueuedSynchronizer</h3><p><a href="#7">AQS同步器原理分析</a></p>
+<p><span id="#7"></span></p>
+<h3 id="JUC同步辅助类"><a href="#JUC同步辅助类" class="headerlink" title="JUC同步辅助类"></a>JUC同步辅助类</h3><ol>
+<li>Semaphore 信号量通常用来限制线程可以同时访问的（物理或逻辑）资源数量。</li>
+<li>CountDownLatch 在完成一组正在其他线程中执行的操作之前，允许一个或多个线程一直阻塞。</li>
+<li>CyclicBarrier 允许一组线程互相等待, 直到到达某个公共的屏障点 (common barrier point)。因为该 barrier在释放等待线程后可以重用，所以称它为循环的barrier。</li>
+<li>Phaser 一种可重用的同步屏障，功能上类似于CyclicBarrier和CountDownLatch，但使用上更为灵活。非常适用于在多线程环境下同步协调分阶段计算任务（Fork/Join框架中的子任务之间需同步时，优先使用Phaser）。</li>
+<li>Exchanger 允许两个线程在某个汇合点交换对象，在某些管道设计时比较有用。Exchanger提供了一个同步点，在这个同步点一对线程可以交换数据。</li>
+</ol>
+<p><span id="#8"></span></p>
+<h3 id="LockSupport"><a href="#LockSupport" class="headerlink" title="LockSupport"></a>LockSupport</h3><ul>
+<li><p>LockSupport是用来创建锁和其他同步类的基本线程阻塞原语。</p>
+</li>
+<li><p>LockSupport中的park() 和 unpark() 的作用分别是阻塞线程和解除阻塞线程。</p>
+<blockquote>
+<p>阻塞与解除阻塞<br>JSR166以前还没有好的阻塞和解除阻塞线程的API可以使用！只有Thread.suspend 和 Thread.resume，但这两个方法已经被废弃了，原因是有可能导致死锁。如果一个线程拥有监视器然后调用Thread.suspend使自已阻塞，另一个线程试图调用Thread.resume去唤醒它，那么这个线程去获取监视器时即出现死锁。直到后来出现的LockSupport解决了这个问题。<br>LockSupport.park可以阻塞一个线程，LockSupport.unpark可以解除阻塞，调用一次park，然后调用多次unpark只会唤醒一个线程，阻塞针对线程而不是针对同步器。特别的，如果一个线程在一个新的同步器上调用park方法有可能立即返回，因为可能有剩余的unpack存在。虽然调用多次unpark是想彻底清除阻塞状态，但这显得很笨拙，而且不划算，更有效的做法是在多次park的时候才多次unpark.</p>
+</blockquote>
+</li>
+<li><p>LockSupport 与Thread.suspend()和Thread.resume()的区别<br>在LockSupport出现之前，如果要block/unblock某个Thread，除了使用Java语言内置的monitor机制之外，只能通过Thread.suspend()和Thread.resume()。目前这两个方法都被标注为废弃。</p>
+</li>
+</ul>
+<p><a href="http://coderbee.net/index.php/concurrent/20131115/577" target="_blank" rel="noopener">http://coderbee.net/index.php/concurrent/20131115/577</a><br><a href="http://zhwbqd.github.io/2015/02/13/lock-in-java.html" target="_blank" rel="noopener">http://zhwbqd.github.io/2015/02/13/lock-in-java.html</a><br><a href="http://alexander-mahone.iteye.com/blog/1841134" target="_blank" rel="noopener">http://alexander-mahone.iteye.com/blog/1841134</a></p>
+<p>by xuyuanfa</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/10/14/架构基础知识2019浓缩篇/" rel="next" title="架构基础知识浓缩篇">
+                <i class="fa fa-chevron-left"></i> 架构基础知识浓缩篇
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+    <div class="comments" id="comments">
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
+    </div>
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <img class="site-author-image" itemprop="image" src="/images/head.jpg" alt="xuyuanfa">
+            
+              <p class="site-author-name" itemprop="name">xuyuanfa</p>
+              <p class="site-description motion-element" itemprop="description">日积月累，云开月明</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">9</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#自旋锁"><span class="nav-number">1.</span> <span class="nav-text">自旋锁</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#synchronized内置锁"><span class="nav-number">2.</span> <span class="nav-text">synchronized内置锁</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#volatile原子变量"><span class="nav-number">3.</span> <span class="nav-text">volatile原子变量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ReentrantLock"><span class="nav-number">4.</span> <span class="nav-text">ReentrantLock</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ReentrantReadWriteLock"><span class="nav-number">5.</span> <span class="nav-text">ReentrantReadWriteLock</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AbstractQueuedSynchronizer"><span class="nav-number">6.</span> <span class="nav-text">AbstractQueuedSynchronizer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JUC同步辅助类"><span class="nav-number">7.</span> <span class="nav-text">JUC同步辅助类</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#LockSupport"><span class="nav-number">8.</span> <span class="nav-text">LockSupport</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">xuyuanfa</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Gemini</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/canvas-nest/canvas-nest.min.js"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+
+  <script type="text/javascript" src="/js/src/affix.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/schemes/pisces.js?v=5.1.4"></script>
+
+
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+    
+      <script id="dsq-count-scr" src="https://cloud.disqus.com/count.js" async></script>
+    
+
+    
+      <script type="text/javascript">
+        var disqus_config = function () {
+          this.page.url = 'http://yoursite.com/2019/10/14/同步锁总结篇/';
+          this.page.identifier = '2019/10/14/同步锁总结篇/';
+          this.page.title = '同步锁总结篇';
+        };
+        var d = document, s = d.createElement('script');
+        s.src = 'https://cloud.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', '' + +new Date());
+        (d.head || d.body).appendChild(s);
+      </script>
+    
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    var isXml = true;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length === 0) {
+      search_path = "search.xml";
+    } else if (/json$/i.test(search_path)) {
+      isXml = false;
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    var onPopupClose = function (e) {
+      $('.popup').hide();
+      $('#local-search-input').val('');
+      $('.search-result-list').remove();
+      $('#no-result').remove();
+      $(".local-search-pop-overlay").remove();
+      $('body').css('overflow', '');
+    }
+
+    function proceedsearch() {
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay"></div>')
+        .css('overflow', 'hidden');
+      $('.search-popup-overlay').click(onPopupClose);
+      $('.popup').toggle();
+      var $localSearchInput = $('#local-search-input');
+      $localSearchInput.attr("autocapitalize", "none");
+      $localSearchInput.attr("autocorrect", "off");
+      $localSearchInput.focus();
+    }
+
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+
+      // start loading animation
+      $("body")
+        .append('<div class="search-popup-overlay local-search-pop-overlay">' +
+          '<div id="search-loading-icon">' +
+          '<i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>' +
+          '</div>' +
+          '</div>')
+        .css('overflow', 'hidden');
+      $("#search-loading-icon").css('margin', '20% auto 0 auto').css('text-align', 'center');
+
+      $.ajax({
+        url: path,
+        dataType: isXml ? "xml" : "json",
+        async: true,
+        success: function(res) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = isXml ? $("entry", res).map(function() {
+            return {
+              title: $("title", this).text(),
+              content: $("content",this).text(),
+              url: $("url" , this).text()
+            };
+          }).get() : res;
+          var input = document.getElementById(search_id);
+          var resultContent = document.getElementById(content_id);
+          var inputEventFunction = function() {
+            var searchText = input.value.trim().toLowerCase();
+            var keywords = searchText.split(/[\s\-]+/);
+            if (keywords.length > 1) {
+              keywords.push(searchText);
+            }
+            var resultItems = [];
+            if (searchText.length > 0) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var hitCount = 0;
+                var searchTextCount = 0;
+                var title = data.title.trim();
+                var titleInLowerCase = title.toLowerCase();
+                var content = data.content.trim().replace(/<[^>]+>/g,"");
+                var contentInLowerCase = content.toLowerCase();
+                var articleUrl = decodeURIComponent(data.url);
+                var indexOfTitle = [];
+                var indexOfContent = [];
+                // only match articles with not empty titles
+                if(title != '') {
+                  keywords.forEach(function(keyword) {
+                    function getIndexByWord(word, text, caseSensitive) {
+                      var wordLen = word.length;
+                      if (wordLen === 0) {
+                        return [];
+                      }
+                      var startPosition = 0, position = [], index = [];
+                      if (!caseSensitive) {
+                        text = text.toLowerCase();
+                        word = word.toLowerCase();
+                      }
+                      while ((position = text.indexOf(word, startPosition)) > -1) {
+                        index.push({position: position, word: word});
+                        startPosition = position + wordLen;
+                      }
+                      return index;
+                    }
+
+                    indexOfTitle = indexOfTitle.concat(getIndexByWord(keyword, titleInLowerCase, false));
+                    indexOfContent = indexOfContent.concat(getIndexByWord(keyword, contentInLowerCase, false));
+                  });
+                  if (indexOfTitle.length > 0 || indexOfContent.length > 0) {
+                    isMatch = true;
+                    hitCount = indexOfTitle.length + indexOfContent.length;
+                  }
+                }
+
+                // show search results
+
+                if (isMatch) {
+                  // sort index by position of keyword
+
+                  [indexOfTitle, indexOfContent].forEach(function (index) {
+                    index.sort(function (itemLeft, itemRight) {
+                      if (itemRight.position !== itemLeft.position) {
+                        return itemRight.position - itemLeft.position;
+                      } else {
+                        return itemLeft.word.length - itemRight.word.length;
+                      }
+                    });
+                  });
+
+                  // merge hits into slices
+
+                  function mergeIntoSlice(text, start, end, index) {
+                    var item = index[index.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    var hits = [];
+                    var searchTextCountInSlice = 0;
+                    while (position + word.length <= end && index.length != 0) {
+                      if (word === searchText) {
+                        searchTextCountInSlice++;
+                      }
+                      hits.push({position: position, length: word.length});
+                      var wordEnd = position + word.length;
+
+                      // move to next position of hit
+
+                      index.pop();
+                      while (index.length != 0) {
+                        item = index[index.length - 1];
+                        position = item.position;
+                        word = item.word;
+                        if (wordEnd > position) {
+                          index.pop();
+                        } else {
+                          break;
+                        }
+                      }
+                    }
+                    searchTextCount += searchTextCountInSlice;
+                    return {
+                      hits: hits,
+                      start: start,
+                      end: end,
+                      searchTextCount: searchTextCountInSlice
+                    };
+                  }
+
+                  var slicesOfTitle = [];
+                  if (indexOfTitle.length != 0) {
+                    slicesOfTitle.push(mergeIntoSlice(title, 0, title.length, indexOfTitle));
+                  }
+
+                  var slicesOfContent = [];
+                  while (indexOfContent.length != 0) {
+                    var item = indexOfContent[indexOfContent.length - 1];
+                    var position = item.position;
+                    var word = item.word;
+                    // cut out 100 characters
+                    var start = position - 20;
+                    var end = position + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if (end < position + word.length) {
+                      end = position + word.length;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    slicesOfContent.push(mergeIntoSlice(content, start, end, indexOfContent));
+                  }
+
+                  // sort slices in content by search text's count and hits' count
+
+                  slicesOfContent.sort(function (sliceLeft, sliceRight) {
+                    if (sliceLeft.searchTextCount !== sliceRight.searchTextCount) {
+                      return sliceRight.searchTextCount - sliceLeft.searchTextCount;
+                    } else if (sliceLeft.hits.length !== sliceRight.hits.length) {
+                      return sliceRight.hits.length - sliceLeft.hits.length;
+                    } else {
+                      return sliceLeft.start - sliceRight.start;
+                    }
+                  });
+
+                  // select top N slices in content
+
+                  var upperBound = parseInt('1');
+                  if (upperBound >= 0) {
+                    slicesOfContent = slicesOfContent.slice(0, upperBound);
+                  }
+
+                  // highlight title and content
+
+                  function highlightKeyword(text, slice) {
+                    var result = '';
+                    var prevEnd = slice.start;
+                    slice.hits.forEach(function (hit) {
+                      result += text.substring(prevEnd, hit.position);
+                      var end = hit.position + hit.length;
+                      result += '<b class="search-keyword">' + text.substring(hit.position, end) + '</b>';
+                      prevEnd = end;
+                    });
+                    result += text.substring(prevEnd, slice.end);
+                    return result;
+                  }
+
+                  var resultItem = '';
+
+                  if (slicesOfTitle.length != 0) {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + highlightKeyword(title, slicesOfTitle[0]) + "</a>";
+                  } else {
+                    resultItem += "<li><a href='" + articleUrl + "' class='search-result-title'>" + title + "</a>";
+                  }
+
+                  slicesOfContent.forEach(function (slice) {
+                    resultItem += "<a href='" + articleUrl + "'>" +
+                      "<p class=\"search-result\">" + highlightKeyword(content, slice) +
+                      "...</p>" + "</a>";
+                  });
+
+                  resultItem += "</li>";
+                  resultItems.push({
+                    item: resultItem,
+                    searchTextCount: searchTextCount,
+                    hitCount: hitCount,
+                    id: resultItems.length
+                  });
+                }
+              })
+            };
+            if (keywords.length === 1 && keywords[0] === "") {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>'
+            } else if (resultItems.length === 0) {
+              resultContent.innerHTML = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>'
+            } else {
+              resultItems.sort(function (resultLeft, resultRight) {
+                if (resultLeft.searchTextCount !== resultRight.searchTextCount) {
+                  return resultRight.searchTextCount - resultLeft.searchTextCount;
+                } else if (resultLeft.hitCount !== resultRight.hitCount) {
+                  return resultRight.hitCount - resultLeft.hitCount;
+                } else {
+                  return resultRight.id - resultLeft.id;
+                }
+              });
+              var searchResultList = '<ul class=\"search-result-list\">';
+              resultItems.forEach(function (result) {
+                searchResultList += result.item;
+              })
+              searchResultList += "</ul>";
+              resultContent.innerHTML = searchResultList;
+            }
+          }
+
+          if ('auto' === 'auto') {
+            input.addEventListener('input', inputEventFunction);
+          } else {
+            $('.search-icon').click(inputEventFunction);
+            input.addEventListener('keypress', function (event) {
+              if (event.keyCode === 13) {
+                inputEventFunction();
+              }
+            });
+          }
+
+          // remove loading animation
+          $(".local-search-pop-overlay").remove();
+          $('body').css('overflow', '');
+
+          proceedsearch();
+        }
+      });
+    }
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched === false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(onPopupClose);
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+    $(document).on('keyup', function (event) {
+      var shouldDismissSearchPopup = event.which === 27 &&
+        $('.search-popup').is(':visible');
+      if (shouldDismissSearchPopup) {
+        onPopupClose();
+      }
+    });
+  </script>
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

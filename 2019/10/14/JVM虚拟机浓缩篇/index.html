@@ -79,17 +79,17 @@
 
 
 
-<meta name="description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
+<meta name="description" content="内存分配区域 GC垃圾收集 JMM内存模型">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Hello World">
-<meta property="og:url" content="http://yoursite.com/2019/10/14/hello-world/index.html">
+<meta property="og:title" content="JVM虚拟机浓缩篇">
+<meta property="og:url" content="http://yoursite.com/2019/10/14/JVM虚拟机浓缩篇/index.html">
 <meta property="og:site_name" content="残酷月光">
-<meta property="og:description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
+<meta property="og:description" content="内存分配区域 GC垃圾收集 JMM内存模型">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-10-14T11:05:16.067Z">
+<meta property="og:updated_time" content="2019-10-15T09:14:25.974Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Hello World">
-<meta name="twitter:description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
+<meta name="twitter:title" content="JVM虚拟机浓缩篇">
+<meta name="twitter:description" content="内存分配区域 GC垃圾收集 JMM内存模型">
 
 
 
@@ -119,13 +119,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/10/14/hello-world/">
+  <link rel="canonical" href="http://yoursite.com/2019/10/14/JVM虚拟机浓缩篇/">
 
 
 
 
 
-  <title>Hello World | 残酷月光</title>
+  <title>JVM虚拟机浓缩篇 | 残酷月光</title>
   
 
 
@@ -284,7 +284,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/14/hello-world/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/14/JVM虚拟机浓缩篇/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="xuyuanfa">
@@ -301,7 +301,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">Hello World</h1>
+          <h1 class="post-title" itemprop="name headline">JVM虚拟机浓缩篇</h1>
         
 
         <div class="post-meta">
@@ -313,7 +313,7 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-14T19:05:16+08:00">
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-14T20:42:20+08:00">
                 2019-10-14
               </time>
             
@@ -332,8 +332,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/10/14/hello-world/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2019/10/14/hello-world/" itemprop="commentCount"></span>
+                <a href="/2019/10/14/JVM虚拟机浓缩篇/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2019/10/14/JVM虚拟机浓缩篇/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -361,19 +361,90 @@
       
 
       
-        <p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
+        <ul>
+<li><a href="##1">内存分配区域</a></li>
+<li><a href="##2">GC垃圾收集</a></li>
+<li><a href="##3">JMM内存模型</a><a id="more"></a>
 
-<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/deployment.html" target="_blank" rel="noopener">Deployment</a></p>
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="内存分配区域"><a href="#内存分配区域" class="headerlink" title="内存分配区域"></a>内存分配区域</h3><p><strong>程序计数器</strong></p>
+<ul>
+<li>当前线程所执行的字节码的行号指示器，在虚拟机的概念模型里，字节码解释器工作时就是通过改变这个计数器的值来选择下一条需要执行的字节码指令。</li>
+<li>线程私有。</li>
+</ul>
+<p><strong>Java虚拟机栈</strong></p>
+<ul>
+<li>Java方法执行的内存模型，每个方法在执行的同时都会创建一个栈帧用于存储局部变量表、操作数栈、动态链接、方法出口等信息。</li>
+<li>局部变量表存放了编译器可知的各种基本数据类型、对象引用和returnAddress类型（指向了一条字节码指令的地址）。</li>
+<li>线程私有。</li>
+</ul>
+<p><strong>本地方法栈</strong></p>
+<ul>
+<li>虚拟机栈为虚拟机指向Java方法（也就是字节码）服务，而本地方法栈则为细腻及使用到的Native方法服务。</li>
+<li>线程私有。</li>
+</ul>
+<p><strong>Java堆</strong></p>
+<ul>
+<li>被所有线程共享的一块内存区域，在虚拟机启动时创建。</li>
+<li>存放对象实例。</li>
+<li>垃圾收集器管理的主要区域，现在收集器级别都采用分代收集算法。</li>
+<li>线程共享。</li>
+</ul>
+<p><strong>方法区</strong></p>
+<ul>
+<li>用于存储已被虚拟机加载的类信息、常量、静态变量、即时编译器编译后的代码等数据。</li>
+<li>别名“Non-Heap”（非堆），目的与Java堆区分。</li>
+<li>垃圾收集主要收集两部分内容：废弃常量和无用的类。</li>
+<li>线程共享。</li>
+</ul>
+<p>其中，程序计数器、虚拟机栈。本地方法栈3个区域随线程而生或灭。</p>
+<p><span id="#2"></span></p>
+<h3 id="GC垃圾收集"><a href="#GC垃圾收集" class="headerlink" title="GC垃圾收集"></a>GC垃圾收集</h3><p><strong>对象存活判断</strong></p>
+<ul>
+<li>引用计数算法：存在相互循环引用问题；</li>
+<li>可达性分析算法：宣告一个对象死亡，至少经历两次标记，可在finalize()中拯救自己。</li>
+</ul>
+<p><strong>垃圾收集算法</strong></p>
+<ul>
+<li>标记清除：效率不高，空间碎片；</li>
+<li>复制算法：预留一块空间；</li>
+<li>标记整理：标记回收对象，移动存活对象，清理边界外的内存；</li>
+<li>分代收集：新生代大批量死去选用复制算法，老年代存活率高选用标记清除或标记整理算法；</li>
+</ul>
+<p><strong>内存分配及回收策略</strong></p>
+<ol>
+<li>HotSpot虚拟机默认Eden区和Survivor区比例是8:1:1</li>
+<li>对象优先在Eden区中分配，不够空间时虚拟机发起一次Minor GC，把存活对象转移到另一块Survivor，GC期间Survivor无法容纳的对象直接进入老年代，通过分配担保机制提前转移到老年代去。</li>
+<li>大对象直接进入老年代，-XX:PretenureSizeThreshold参数可配置大于这个设置值的对象直接进入老年代。</li>
+<li>长期存活对象将进入老年代，对象在Survivor区中每熬过一次Minor GC，年龄加1岁，当达到一定程度（默认为15岁），就转移到老年代。-XX:MaxTenuringThreshold设置年龄阀值。</li>
+<li>如果在Survivor空间中相同年龄所有对象大小的总和大于Survivor空间的一半，年龄大于或等于该年龄的对象就可以直接进入老年代，无须等到MaxTenuringThreshold设置的值。</li>
+</ol>
+<p><strong>进入老年代的条件</strong></p>
+<ol>
+<li>Survivor无法容纳的对象直接进入老年代</li>
+<li>大对象直接进入老年代，参数配置-XX:PretenureSizeThreshold</li>
+<li>长期标记存活进入老年代，参数配置-XX:MaxTenuringThreshold设置年龄阀值</li>
+<li>相同年龄超过Survivor空间的一半，大于等于该年龄的对象提前进入老年代</li>
+</ol>
+<p><strong>触发GC</strong></p>
+<ul>
+<li>Minor GC，当Eden区没有足够的空间进行分配时，虚拟机发起一次Minor GC。</li>
+<li>Full GC，JDK6 Update24之后，只要老年代最大可用的连续空间大于新生代对象总大小或者历次晋升的平均大小就会进行Minor GC，否则将进行Full GC。</li>
+</ul>
+<p><span id="#3"></span></p>
+<h3 id="JMM内存模型"><a href="#JMM内存模型" class="headerlink" title="JMM内存模型"></a>JMM内存模型</h3><ul>
+<li>线程-本地内存-主内存，之间的关系，本地内存存储共享变量的副本，本地内存是抽象概念并不存在，它涵盖了缓存，写缓冲区，寄存器以及其他的硬件和编译器优化。</li>
+<li>JMM通过控制主内存与每个线程的本地内存之间的交互，来为java程序员提供内存可见性保证。</li>
+<li>从java源代码到最终实际执行的指令序列，会分别经历下面三种重排序：</li>
+</ul>
+<ol>
+<li>编译器优化的重排序。编译器在不改变单线程程序语义的前提下，可以重新安排语句的执行顺序。</li>
+<li>指令级并行的重排序。现代处理器采用了指令级并行技术（Instruction-Level Parallelism， ILP）来将多条指令重叠执行。如果不存在数据依赖性，处理器可以改变语句对应机器指令的执行顺序。</li>
+<li>内存系统的重排序。由于处理器使用缓存和读/写缓冲区，这使得加载和存储操作看上去可能是在乱序执行</li>
+</ol>
+<p>by xuyuanfa</p>
 
       
     </div>
@@ -398,14 +469,18 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
+              <a href="/2019/10/14/JUC并发包浓缩篇/" rel="next" title="JUC并发包浓缩篇">
+                <i class="fa fa-chevron-left"></i> JUC并发包浓缩篇
+              </a>
+            
           </div>
 
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2019/10/14/JUC并发包浓缩篇/" rel="prev" title="JUC并发包浓缩篇">
-                JUC并发包浓缩篇 <i class="fa fa-chevron-right"></i>
+              <a href="/2019/10/14/Spring之AOP和IoC浓缩篇/" rel="prev" title="Spring之AOP和IoC浓缩篇">
+                Spring之AOP和IoC浓缩篇 <i class="fa fa-chevron-right"></i>
               </a>
             
           </div>
@@ -532,7 +607,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Quick-Start"><span class="nav-number">1.</span> <span class="nav-text">Quick Start</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Create-a-new-post"><span class="nav-number">1.1.</span> <span class="nav-text">Create a new post</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Run-server"><span class="nav-number">1.2.</span> <span class="nav-text">Run server</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Generate-static-files"><span class="nav-number">1.3.</span> <span class="nav-text">Generate static files</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Deploy-to-remote-sites"><span class="nav-number">1.4.</span> <span class="nav-text">Deploy to remote sites</span></a></li></ol></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#内存分配区域"><span class="nav-number">1.</span> <span class="nav-text">内存分配区域</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#GC垃圾收集"><span class="nav-number">2.</span> <span class="nav-text">GC垃圾收集</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#JMM内存模型"><span class="nav-number">3.</span> <span class="nav-text">JMM内存模型</span></a></li></ol></div>
             
 
           </div>
@@ -709,9 +784,9 @@
     
       <script type="text/javascript">
         var disqus_config = function () {
-          this.page.url = 'http://yoursite.com/2019/10/14/hello-world/';
-          this.page.identifier = '2019/10/14/hello-world/';
-          this.page.title = 'Hello World';
+          this.page.url = 'http://yoursite.com/2019/10/14/JVM虚拟机浓缩篇/';
+          this.page.identifier = '2019/10/14/JVM虚拟机浓缩篇/';
+          this.page.title = 'JVM虚拟机浓缩篇';
         };
         var d = document, s = d.createElement('script');
         s.src = 'https://cloud.disqus.com/embed.js';

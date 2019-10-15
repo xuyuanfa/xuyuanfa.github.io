@@ -1,0 +1,1060 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title>同步锁总结篇</title>
+    <url>/2019/10/14/%E5%90%8C%E6%AD%A5%E9%94%81%E6%80%BB%E7%BB%93%E7%AF%87/</url>
+    <content><![CDATA[<ul>
+<li><a href="##1">自旋锁</a></li>
+<li><a href="##2">synchronized内置锁</a></li>
+<li><a href="##3">volatile原子变量</a></li>
+<li><a href="##4">ReentrantLock</a></li>
+<li><a href="##5">ReentrantReadWriteLock</a></li>
+<li><a href="##6">AbstractQueuedSynchronizer</a></li>
+<li><a href="##7">JUC同步辅助类</a></li>
+<li><a href="##8">LockSupport</a><a id="more"></a>
+
+
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="自旋锁"><a href="#自旋锁" class="headerlink" title="自旋锁"></a>自旋锁</h3><ul>
+<li>自旋锁是指当一个线程尝试获取某个锁时，如果该锁已被其他线程占用，就一直循环检测锁是否被释放，而不是进入线程挂起或睡眠状态。</li>
+<li>自旋锁适用于锁保护的临界区很小的情况，临界区很小的话，锁占用的时间就很短。</li>
+<li>自旋锁（Spin lock）、排队自旋锁（TargetLock）、MCS锁（MCSLock）、CLH锁（CLHLock）</li>
+</ul>
+<p><strong>简单自旋锁</strong></p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public class SpinLock &#123;</span><br><span class="line">    private AtomicReference&lt;Thread&gt; owner = new AtomicReference&lt;Thread&gt;();</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        Thread currentThread = Thread.currentThread();</span><br><span class="line">        // 如果锁未被占用，则设置当前线程为锁的拥有者</span><br><span class="line">        while (!owner.compareAndSet(null, currentThread)) &#123;&#125;</span><br><span class="line">    &#125;</span><br><span class="line">    public void unlock() &#123;</span><br><span class="line">        Thread currentThread = Thread.currentThread();</span><br><span class="line">        // 只有锁的拥有者才能释放锁</span><br><span class="line">        owner.compareAndSet(currentThread, null);&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>缺点：</p>
+<ul>
+<li>CAS操作需要硬件的配合；</li>
+<li>保证各个CPU的缓存（L1、L2、L3、跨CPU Socket、主存）的数据一致性，通讯开销很大，在多处理器系统上更严重；</li>
+<li>没法保证公平性，不保证等待进程/线程按照FIFO顺序获得锁。</li>
+</ul>
+<p><strong>排队自旋锁</strong><br>有序的公平锁。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public class TicketLock &#123;</span><br><span class="line">    private AtomicInteger serviceNum = new AtomicInteger();</span><br><span class="line">    private AtomicInteger ticketNum = new AtomicInteger();</span><br><span class="line">    private static final ThreadLocal&lt;Integer&gt; LOCAL = new ThreadLocal&lt;Integer&gt;();</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        int myticket = ticketNum.getAndIncrement();</span><br><span class="line">        LOCAL.set(myticket);</span><br><span class="line">        while (myticket != serviceNum.get()) &#123;&#125;</span><br><span class="line">    &#125;</span><br><span class="line">    public void unlock() &#123;</span><br><span class="line">        int myticket = LOCAL.get();</span><br><span class="line">        if (myticket == null) </span><br><span class="line">            return;</span><br><span class="line">        serviceNum.compareAndSet(myticket, myticket + 1);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>缺点：</p>
+<ul>
+<li>Ticket Lock 虽然解决了公平性的问题，但是多处理器系统上，每个进程/线程占用的处理器都在读写同一个变量serviceNum ，每次读写操作都必须在多个处理器缓存之间进行缓存同步，这会导致繁重的系统总线和内存的流量，大大降低系统整体的性能。</li>
+</ul>
+<p><strong>MCS锁</strong><br>MCS Spinlock 是一种基于链表的可扩展、高性能、公平的自旋锁，申请线程只在本地变量上自旋，直接前驱负责通知其结束自旋，从而极大地减少了不必要的处理器缓存同步的次数，降低了总线和内存的开销。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public class MCSLock &#123;</span><br><span class="line">    public static class MCSNode &#123;</span><br><span class="line">        volatile MCSNode next;</span><br><span class="line">        volatile boolean isLocked = true;</span><br><span class="line">    &#125;</span><br><span class="line">    private static final ThreadLocal&lt;MCSNode&gt; NODE = new ThreadLocal&lt;MCSNode&gt;();</span><br><span class="line">    @SuppressWarnings(&quot;unused&quot;)</span><br><span class="line">    private volatile MCSNode queue;</span><br><span class="line">    private static final AtomicReferenceFieldUpdater&lt;MCSLock, MCSNode&gt; UPDATER = </span><br><span class="line">        AtomicReferenceFieldUpdater.newUpdater(MCSLock.class, MCSNode.class, &quot;queue&quot;);</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        MCSNode currentNode = new MCSNode();</span><br><span class="line">        NODE.set(currentNode);</span><br><span class="line">        MCSNode preNode = UPDATER.getAndSet(this, currentNode);</span><br><span class="line">        if (preNode != null) &#123;</span><br><span class="line">            preNode.next = currentNode;</span><br><span class="line">            while (currentNode.isLocked) &#123;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    public void unlock() &#123;</span><br><span class="line">        MCSNode currentNode = NODE.get();</span><br><span class="line">        if (currentNode.next == null) &#123;</span><br><span class="line">            if (UPDATER.compareAndSet(this, currentNode, null)) &#123;</span><br><span class="line">                // compareAndSet返回true表示确实没有人排在自己后面</span><br><span class="line">                return;</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                // 在修改</span><br><span class="line">                while (currentNode.next == null) &#123;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        currentNode.next.isLocked = false;</span><br><span class="line">        currentNode.next = null;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>CLH锁</strong><br>CLH锁也是一种基于链表的可扩展、高性能、公平的自旋锁，申请线程只在本地变量上自旋，它不断轮询前驱的状态，如果发现前驱释放了锁就结束自旋。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public class CLHLock &#123;</span><br><span class="line">    public static class CLHNode &#123;</span><br><span class="line">        private volatile boolean isLocked = true;</span><br><span class="line">    &#125;</span><br><span class="line">    @SuppressWarnings(&quot;unused&quot;)</span><br><span class="line">    private volatile CLHNode tail;</span><br><span class="line">    private static final ThreadLocal&lt;CLHNode&gt; LOCAL = new ThreadLocal&lt;CLHNode&gt;();</span><br><span class="line">    private static final AtomicReferenceFieldUpdater&lt;CLHLock, CLHNode&gt; UPDATER = AtomicReferenceFieldUpdater</span><br><span class="line">            .newUpdater(CLHLock.class, CLHNode.class, &quot;tail&quot;);</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        CLHNode node = new CLHNode();</span><br><span class="line">        LOCAL.set(node);</span><br><span class="line">        CLHNode preNode = UPDATER.getAndSet(this, node);</span><br><span class="line">        if (preNode != null) &#123;</span><br><span class="line">            while (preNode.isLocked) &#123;</span><br><span class="line">            &#125;</span><br><span class="line">            preNode = null;</span><br><span class="line">            LOCAL.set(node);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    public void unlock() &#123;</span><br><span class="line">        CLHNode node = LOCAL.get();</span><br><span class="line">        if (!UPDATER.compareAndSet(this, node, null)) &#123;</span><br><span class="line">            node.isLocked = false;</span><br><span class="line">        &#125;</span><br><span class="line">        node = null;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>缺点：</p>
+<ul>
+<li>CLHlock是不停的查询前驱变量， 导致不适合在NUMA 架构下使用（在这种结构下，每个线程分布在不同的物理内存区域）</li>
+</ul>
+<p><strong>NUMA架构简介</strong><br>由于所有CPU Core都是通过共享一个北桥来读取内存，随着核数不断的发展，北桥在响应时间上的性能瓶颈越来越明显。于是，聪明的硬件设计师们，先到了把内存控制器（原本北桥中读取内存的部分）也做个拆分，平分到了每个die上。于是NUMA就出现了！<br><a href="http://cenalulu.github.io/linux/numa/" target="_blank" rel="noopener">http://cenalulu.github.io/linux/numa/</a></p>
+<p><span id="#2"></span></p>
+<h3 id="synchronized内置锁"><a href="#synchronized内置锁" class="headerlink" title="synchronized内置锁"></a>synchronized内置锁</h3><ol>
+<li>作为修饰符加在方法声明上, synchronized修饰非静态方法时表示锁住了调用该方法的堆对象（相对于synchronized(this)）, 修饰静态方法时表示锁住了这个类在方法区中的类对象（相对于synchronized(X.class)）；</li>
+<li>synchronized(X.class) 使用类对象作为monitor. 同一时间只有一个线程可以能访问块中资源</li>
+<li>synchronized(this)和synchronized(mutex) 都是对象锁, 同一时间每个实例都保证只能有一个实例能访问块中资源；<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public class SyncMethod &#123;</span><br><span class="line">    private int value = 0;</span><br><span class="line">    private final Object mutex = new Object();</span><br><span class="line"></span><br><span class="line">    public synchronized int incAndGet0() &#123;</span><br><span class="line">       return ++value;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public int incAndGet1() &#123;</span><br><span class="line">        synchronized(this)&#123;</span><br><span class="line">            return ++value;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public int incAndGet2() &#123;</span><br><span class="line">       synchronized(SyncMethod.class)&#123;</span><br><span class="line">            return ++value;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public int incAndGet3() &#123;</span><br><span class="line">       synchronized(mutex)&#123;</span><br><span class="line">            return ++value;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public static synchonrize int incAndGet4() &#123;</span><br><span class="line">       synchronized(mutex)&#123;</span><br><span class="line">            return ++value;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+</li>
+</ol>
+<p><span id="#3"></span></p>
+<h3 id="volatile原子变量"><a href="#volatile原子变量" class="headerlink" title="volatile原子变量"></a>volatile原子变量</h3><p>synchronized的代码块是确保可见性和原子性的，volatile只能确保可见性。<br>当且仅当下面条件全部满足时, 才能使用volatile保证原子性：</p>
+<ul>
+<li>对变量的写入操作不依赖于变量的当前值，或者能确保只有单个线程在更新</li>
+<li>该变量不会与其他状态变量共同参与不变性条件中</li>
+</ul>
+<p><strong>volatile两个语义</strong><br>a.保证此变量对所有线程的可见性；<br>b.禁止指令重排序优化；</p>
+<ul>
+<li>保证原子性的规则<br>a.运算结果并不依赖变量的当前值，或者能够确保只有单一的线程修改变量的值；<br>b.变量不需要与其他的状态变量共同参与不变约束；</li>
+<li>可见性指令实现<br>lock addl $0x0,(%esp)<br>addl $0x0,(%esp)把ESP寄存器的值加0；<br>lock前缀使本CPU的cache写入内存，该写入动作会引起别的CPU或内核无效化其cache；<br>通过这样的空操作，让volatile变量的修改对其他CPU立即可见。</li>
+<li>指令重排序<br>是指CPU采用了允许将多条指令不按程序规定的顺序分开发送给各相应的电路单元处理；<br>lock addl $0x0,(%esp)指令把修改同步到内存时，所有之前的操作都已经执行完成，实现内存屏障的效果。</li>
+</ul>
+<p><span id="#4"></span></p>
+<h3 id="ReentrantLock"><a href="#ReentrantLock" class="headerlink" title="ReentrantLock"></a>ReentrantLock</h3><ul>
+<li>ReentrantLock基于AbstractQueuedSynchronizer实现，并基于内部抽象类Sync实现了公平锁FairSync和非公平锁NonfairSync，默认非公平锁。</li>
+<li>高级功能：等待可中断、公平锁、锁绑定多个条件。</li>
+<li>性能因素，虚拟机在未来性能改进更加偏向于原生的synchronized，提倡优先考虑synchronized。</li>
+</ul>
+<p><strong>Condition</strong></p>
+<ul>
+<li>Condition是被绑定到Lock上的，要创建一个Lock的Condition必须用newCondition()方法。</li>
+<li>锁绑定多个条件，只需多次调用newCondition()方法。</li>
+<li>Condition的实例对象相对于Synchronized锁定的Object对象，可指定时间。<ul>
+<li>await()对应wait()</li>
+<li>signal()对应notify()</li>
+<li>signalAll()对应notifyAll()</li>
+</ul>
+</li>
+</ul>
+<p><span id="#5"></span></p>
+<h3 id="ReentrantReadWriteLock"><a href="#ReentrantReadWriteLock" class="headerlink" title="ReentrantReadWriteLock"></a>ReentrantReadWriteLock</h3><p>可重入的读写锁。<br>基于AQS实现，利用锁状态state实现读写锁：</p>
+<ol>
+<li>以锁状态state的高16位保存读锁状态，低16位保存写锁状态；</li>
+<li>读锁是共享锁，读读不互斥，高16位保存读锁获取数，当低16位大于0且不是当前线程时，存在写锁互斥；</li>
+</ol>
+<p>源码分析:<br>读锁</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public static class ReadLock implements Lock, java.io.Serializable  &#123;</span><br><span class="line">    private final Sync sync;</span><br><span class="line">    protected ReadLock(ReentrantReadWriteLock lock) &#123;</span><br><span class="line">        sync = lock.sync;</span><br><span class="line">    &#125;</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        sync.acquireShared(1);//共享锁</span><br><span class="line">    &#125;</span><br><span class="line">    public void lockInterruptibly() throws InterruptedException &#123;</span><br><span class="line">        sync.acquireSharedInterruptibly(1);</span><br><span class="line">    &#125;</span><br><span class="line">    public  boolean tryLock() &#123;</span><br><span class="line">        return sync.tryReadLock();</span><br><span class="line">    &#125;</span><br><span class="line">    public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException &#123;</span><br><span class="line">        return sync.tryAcquireSharedNanos(1, unit.toNanos(timeout));</span><br><span class="line">    &#125;</span><br><span class="line">    public  void unlock() &#123;</span><br><span class="line">        sync.releaseShared(1);</span><br><span class="line">    &#125;</span><br><span class="line">    public Condition newCondition() &#123;</span><br><span class="line">        throw new UnsupportedOperationException();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>写锁</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public static class WriteLock implements Lock, java.io.Serializable  &#123;</span><br><span class="line">    private final Sync sync;</span><br><span class="line">    protected WriteLock(ReentrantReadWriteLock lock) &#123;</span><br><span class="line">        sync = lock.sync;</span><br><span class="line">    &#125;</span><br><span class="line">    public void lock() &#123;</span><br><span class="line">        sync.acquire(1);//独占锁</span><br><span class="line">    &#125;</span><br><span class="line">    public void lockInterruptibly() throws InterruptedException &#123;</span><br><span class="line">        sync.acquireInterruptibly(1);</span><br><span class="line">    &#125;</span><br><span class="line">    public boolean tryLock( ) &#123;</span><br><span class="line">        return sync.tryWriteLock();</span><br><span class="line">    &#125;</span><br><span class="line">    public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException &#123;</span><br><span class="line">        return sync.tryAcquireNanos(1, unit.toNanos(timeout));</span><br><span class="line">    &#125;</span><br><span class="line">    public void unlock() &#123;</span><br><span class="line">        sync.release(1);</span><br><span class="line">    &#125;</span><br><span class="line">    public Condition newCondition() &#123;</span><br><span class="line">        return sync.newCondition();</span><br><span class="line">    &#125;</span><br><span class="line">    public boolean isHeldByCurrentThread() &#123;</span><br><span class="line">        return sync.isHeldExclusively();</span><br><span class="line">    &#125;</span><br><span class="line">    public int getHoldCount() &#123;</span><br><span class="line">        return sync.getWriteHoldCount();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>WriteLock是独占锁，和ReentrantLock里面的实现几乎相同，都是使用了AQS的acquire/release操作，锁状态state的使用不同。</li>
+<li>ReadLock是共享锁，当WriteLock有锁（锁状态state低16位大于0）发生读写互斥。</li>
+<li>AQS中的锁状态state字段（int类型，32位）用来描述有多少线程获持有锁。高位16位表示共享锁的数量，低位16位表示独占锁的数量（或者重入数量）。2^16-1=65536，所以共享锁和独占锁的数量最大只能是65535。</li>
+</ul>
+<p>写入锁分析:</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">protected final boolean tryAcquire(int acquires) &#123;</span><br><span class="line">    Thread current = Thread.currentThread();</span><br><span class="line">    int c = getState();</span><br><span class="line">    int w = exclusiveCount(c);</span><br><span class="line">    if (c != 0) &#123;</span><br><span class="line">        // (Note: if c != 0 and w == 0 then shared count != 0)</span><br><span class="line">        if (w == 0 || current != getExclusiveOwnerThread())</span><br><span class="line">            return false;</span><br><span class="line">        if (w + exclusiveCount(acquires) &gt; MAX_COUNT)</span><br><span class="line">            throw new Error(&quot;Maximum lock count exceeded&quot;);</span><br><span class="line">        // Reentrant acquire</span><br><span class="line">        setState(c + acquires);</span><br><span class="line">        return true;</span><br><span class="line">    &#125;</span><br><span class="line">    if (writerShouldBlock() ||</span><br><span class="line">        !compareAndSetState(c, c + acquires))</span><br><span class="line">        return false;</span><br><span class="line">    setExclusiveOwnerThread(current);</span><br><span class="line">    return true;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>该方法是写锁调用的获取独占锁方法。</li>
+<li>锁状态不为0，写锁为0（此时存在读锁）或者独占锁持有线程不是当前线程，即会发生读写互斥返回false，或者写入锁的数量（重入数）大于65535就抛出一个Error异常。</li>
+<li>锁状态为0，可能是锁刚好被释放而为0，如果读写锁是公平锁时，需要判断链表中是否有正在排队的线程节点，有则需要排队返回false；如果被其他线程抢先获取写锁则CAS失败返回false。</li>
+<li>设置独占线程（写线程）为当前线程，返回true。</li>
+</ul>
+<p><strong>读写锁特性</strong></p>
+<ul>
+<li>重入性：读写锁允许同个线程按照请求锁的顺序重新获取读取锁或者写入锁。同个线程获取写入锁后可以再次获取读取锁，但获取读取锁后却不能获取写入锁。</li>
+<li>锁降级：线程获取写入锁后可以获取读取锁，然后释放写入锁，这样就从写入锁变成了读取锁，从而实现锁降级的特性。</li>
+<li>锁获取中断：读取锁和写入锁都支持获取锁期间被中断。这个和独占锁一致。</li>
+<li>条件变量：写入锁提供了条件变量(Condition)的支持，这个和独占锁一致，但是读取锁却不允许获取条件变量，将得到一个UnsupportedOperationException异常。</li>
+</ul>
+<p><span id="#6"></span></p>
+<h3 id="AbstractQueuedSynchronizer"><a href="#AbstractQueuedSynchronizer" class="headerlink" title="AbstractQueuedSynchronizer"></a>AbstractQueuedSynchronizer</h3><p><a href="#7">AQS同步器原理分析</a></p>
+<p><span id="#7"></span></p>
+<h3 id="JUC同步辅助类"><a href="#JUC同步辅助类" class="headerlink" title="JUC同步辅助类"></a>JUC同步辅助类</h3><ol>
+<li>Semaphore 信号量通常用来限制线程可以同时访问的（物理或逻辑）资源数量。</li>
+<li>CountDownLatch 在完成一组正在其他线程中执行的操作之前，允许一个或多个线程一直阻塞。</li>
+<li>CyclicBarrier 允许一组线程互相等待, 直到到达某个公共的屏障点 (common barrier point)。因为该 barrier在释放等待线程后可以重用，所以称它为循环的barrier。</li>
+<li>Phaser 一种可重用的同步屏障，功能上类似于CyclicBarrier和CountDownLatch，但使用上更为灵活。非常适用于在多线程环境下同步协调分阶段计算任务（Fork/Join框架中的子任务之间需同步时，优先使用Phaser）。</li>
+<li>Exchanger 允许两个线程在某个汇合点交换对象，在某些管道设计时比较有用。Exchanger提供了一个同步点，在这个同步点一对线程可以交换数据。</li>
+</ol>
+<p><span id="#8"></span></p>
+<h3 id="LockSupport"><a href="#LockSupport" class="headerlink" title="LockSupport"></a>LockSupport</h3><ul>
+<li><p>LockSupport是用来创建锁和其他同步类的基本线程阻塞原语。</p>
+</li>
+<li><p>LockSupport中的park() 和 unpark() 的作用分别是阻塞线程和解除阻塞线程。</p>
+<blockquote>
+<p>阻塞与解除阻塞<br>JSR166以前还没有好的阻塞和解除阻塞线程的API可以使用！只有Thread.suspend 和 Thread.resume，但这两个方法已经被废弃了，原因是有可能导致死锁。如果一个线程拥有监视器然后调用Thread.suspend使自已阻塞，另一个线程试图调用Thread.resume去唤醒它，那么这个线程去获取监视器时即出现死锁。直到后来出现的LockSupport解决了这个问题。<br>LockSupport.park可以阻塞一个线程，LockSupport.unpark可以解除阻塞，调用一次park，然后调用多次unpark只会唤醒一个线程，阻塞针对线程而不是针对同步器。特别的，如果一个线程在一个新的同步器上调用park方法有可能立即返回，因为可能有剩余的unpack存在。虽然调用多次unpark是想彻底清除阻塞状态，但这显得很笨拙，而且不划算，更有效的做法是在多次park的时候才多次unpark.</p>
+</blockquote>
+</li>
+<li><p>LockSupport 与Thread.suspend()和Thread.resume()的区别<br>在LockSupport出现之前，如果要block/unblock某个Thread，除了使用Java语言内置的monitor机制之外，只能通过Thread.suspend()和Thread.resume()。目前这两个方法都被标注为废弃。</p>
+</li>
+</ul>
+<p><a href="http://coderbee.net/index.php/concurrent/20131115/577" target="_blank" rel="noopener">http://coderbee.net/index.php/concurrent/20131115/577</a><br><a href="http://zhwbqd.github.io/2015/02/13/lock-in-java.html" target="_blank" rel="noopener">http://zhwbqd.github.io/2015/02/13/lock-in-java.html</a><br><a href="http://alexander-mahone.iteye.com/blog/1841134" target="_blank" rel="noopener">http://alexander-mahone.iteye.com/blog/1841134</a></p>
+<p>by xuyuanfa</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>架构基础知识浓缩篇</title>
+    <url>/2019/10/14/%E6%9E%B6%E6%9E%84%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%862019%E6%B5%93%E7%BC%A9%E7%AF%87/</url>
+    <content><![CDATA[<ul>
+<li><a href="##1">架构设计的目的</a></li>
+<li><a href="##2">常见的软件复杂度</a></li>
+<li><a href="##3">架构设计原则</a></li>
+<li><a href="##4">高性能架构模式</a></li>
+<li><a href="##5">高可用架构模式</a></li>
+<li><a href="##6">可扩展架构模式</a><a id="more"></a>
+
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="架构设计的目的"><a href="#架构设计的目的" class="headerlink" title="架构设计的目的"></a>架构设计的目的</h3><p>主要目的是为了解决复杂度带来的问题。</p>
+<p><span id="#2"></span></p>
+<h3 id="常见的软件复杂度"><a href="#常见的软件复杂度" class="headerlink" title="常见的软件复杂度"></a>常见的软件复杂度</h3><ul>
+<li>高性能：单机复杂度（多进程、多线程、进程间通信、多线程并发），集群复杂度（任务分配、任务分解）；高性能增加机器目的是扩展处理性能。</li>
+<li>高可用：计算高可用，存储高可用（CAP定理），高可用状态决策（独裁式、协商式、民主式）；高可用增加机器目的是冗余处理单元。</li>
+<li>可扩展性：变化层和稳定层，抽象层和实现层（典型实践是设计模式和规则引擎）。</li>
+<li>低成本：开创全新技术领域，引入新技术。</li>
+<li>安全：功能安全（防小偷），架构安全（防强盗，传统依靠防火墙，互联网目前没有太好的设计手段）。</li>
+<li>规模：功能增多（系统复杂度指数级上升），数据增多（系统复杂度发生质变）。</li>
+</ul>
+<p><span id="#3"></span></p>
+<h3 id="架构设计原则"><a href="#架构设计原则" class="headerlink" title="架构设计原则"></a>架构设计原则</h3><ul>
+<li>合适原则：合适优于业界领先。</li>
+<li>简单原则：简单优于复杂。</li>
+<li>演化原则：演化优于一步到位。</li>
+</ul>
+<p><span id="#4"></span></p>
+<h3 id="架构设计流程"><a href="#架构设计流程" class="headerlink" title="架构设计流程"></a>架构设计流程</h3><ul>
+<li>识别复杂度：分析系统的复杂度，主要的复杂度问题列出来，优先解决当前面临最主要的复杂度问题。</li>
+<li>设计备选方案：3~5个为最佳，差异要明显，不要局限于熟悉的技术；备选方案不用过于详细，关注的是技术选型，而不是技术细节。</li>
+<li>评估和选择备选方案：360度环评，列出关注的质量属性点（性能、可用性、硬件成本、项目投入、复杂度、安全性、可扩展性等），评估综合挑选适合当前情况的最优方案；评估未来业务发展规模，以当前业务规模乘以2~4即可，小乘4大乘2。</li>
+<li>详细方案设计：对关键细节（设计原理）有较深入的理解（避免成为PPT架构师），分步骤、分阶段、分系统等方式降低系统复杂度。</li>
+</ul>
+<p><span id="#5"></span></p>
+<h3 id="高性能架构模式"><a href="#高性能架构模式" class="headerlink" title="高性能架构模式"></a>高性能架构模式</h3><p><strong>存储高性能</strong></p>
+<ul>
+<li>关系数据库：读写分离（解决复制延迟：写操作后读主机，业务入侵；二次读取；关键业务读写主机，非关键业务读写分离），分库分表（业务分库、垂直分表、水平分表）。</li>
+<li>NoSQL：键值存储（Redis），文档数据库（MongoDB），列式数据库（HBase），全文搜索引擎（Elasticsearch）。</li>
+<li>缓存：缓存穿透，缓存雪崩，缓存热点。</li>
+</ul>
+<p><strong>计算高性能</strong></p>
+<ul>
+<li>单服务器高性能：PPC，prefork，TPC，prethread，Reactor（单Reactor单进程/单线程、单Reactor多线程、多Reactor多进程/线程），Proactor。</li>
+<li>集群高性能：负载均衡（DNS（地理级别）、硬件（集群级别，F5、A10）、软件（机器级别，Nginx、LVS））。</li>
+</ul>
+<h3 id="高可用架构模式"><a href="#高可用架构模式" class="headerlink" title="高可用架构模式"></a>高可用架构模式</h3><p><strong>分布式理论</strong></p>
+<ul>
+<li>CAP理论：一致性、可用性、分区容错性，涉及读写操作时只能保证两个，关注的是分布式系统数据读写。</li>
+<li>BASE理论：基本可用、软状态、最终一致性，是对CAP中AP方案的一个补充。</li>
+<li>ACID理论：原子性、一致性、隔离性、持久性，数据库事务完整性的理论。</li>
+</ul>
+<p><strong>存储高可用</strong></p>
+<ul>
+<li>主备复制：备机只作为备份，当延时的数据量较大时及时报警。</li>
+<li>主从复制：从机只负责读操作，当延时的数据量较大时及时报警。</li>
+<li>主备倒换与主从倒换：互连式、中介式、模拟式。</li>
+<li>主主复制：必须保证数据能够双向复制，一般适合于临时性、可丢失、可覆盖的数据场景。</li>
+<li>数据集群<ul>
+<li>数据集中式集群：1主多备或1主多从。</li>
+<li>数据分散式集群：可伸缩性，适合业务数据量巨大，集群机器数量庞大的业务场景。</li>
+<li>分布式事务算法<ul>
+<li>分布式事务二阶段提交：采用预写式日志；第一阶段提交请求，询问参与者并等待，参与者执行所有事务操作，并将Undo信息和Redo信息写入日志；第二阶段提交执行，当协调者收到所有参与者的成功响应，发起commit请求，当协调者收到任一参与者的失败响应或超时，发起回滚请求执行Undo。</li>
+<li>分布式事务三阶段提交：针对二阶段提交算法“单点故障”的解决方案，超时则提交避免阻塞，同样存在数据不一致问题；第一阶段提交判断，所有参与者成功响应则继续；第二阶段准备提交，执行事务操作，将Undo和Redo信息写入事务日志；第三阶段提交执行，当协调者收到所有参与者成功响应，发起commit请求，否则发出终止信息，事务回滚，当参与者等待commit消息超时后继续提交事务。</li>
+</ul>
+</li>
+<li>分布式一致性算法：Paxos、Raft、ZAB。</li>
+</ul>
+</li>
+<li>数据分区：应对地理级别，复制规则分为集中式、互备式、独立式。</li>
+</ul>
+<p><strong>计算高可用</strong></p>
+<ul>
+<li>主备：一般推荐温备方式，适合频率不高的业务，不太适合在线的业务。</li>
+<li>主从：和存储高可用中的主从复制架构类似。</li>
+<li>对称集群：负载均衡集群。</li>
+<li>非对称集群：将任务划分为不同类型并分配给不同角色的集群节点。</li>
+</ul>
+<p><strong>业务高可用</strong></p>
+<ul>
+<li>异地多活：保证核心业务的异地多活，核心数据最终一致性，采用多种手段同步数据（消息队列、二次读取、存储系统同步、回源读取、重新生成数据），只保证绝大部分用户的异地多活。</li>
+<li>接口故障应对：降级（优先保证核心业务），熔断（需要有统一API调用层），限流（限制访问量），排队（限流的变种，但非直接拒绝）。</li>
+</ul>
+<p><span id="#6"></span></p>
+<h3 id="可扩展架构模式"><a href="#可扩展架构模式" class="headerlink" title="可扩展架构模式"></a>可扩展架构模式</h3><p>拆分思路：面向流程拆分（每个阶段作为一部分），面向服务拆分（每个服务作为一部分），面向功能拆分（每个功能作为一部分）。</p>
+<ul>
+<li><p>面向流程拆分：分层架构。</p>
+</li>
+<li><p>面向服务拆分：SOA、微服务。</p>
+</li>
+<li><p>面向功能拆分：微内核架构。</p>
+</li>
+<li><p>分层架构</p>
+<ul>
+<li>C/S架构、B/S架构（用户交互划分）；</li>
+<li>MVC架构。MVP架构（职责划分，两两交互）；</li>
+<li>逻辑分层架构（职责划分，自顶向下依赖，层层传递隔离关注点）。</li>
+</ul>
+</li>
+<li><p>SOA架构</p>
+<ul>
+<li>更多是传统企业，互联网并没有大规模；</li>
+<li>三个关键概念（服务、ESB、松耦合）；</li>
+<li>使用ESB屏蔽异构系统对外提供各种不同的接口方式。</li>
+</ul>
+</li>
+<li><p>微服务架构</p>
+<ul>
+<li>SOA和微服务的关系和区别：<ul>
+<li>微服务是SOA的实现方式，微服务是去掉ESB后的SOA，不同架构理念（有无ESB、服务粒度、架构设计目标等）；</li>
+<li>微服务更适合于快速、轻量级、基于Web的互联网系统；微服务关键词small、lightweight、automated；</li>
+<li>SOA由企业IT服务系统庞大复杂背景，改造成本高，但业务要求互通，而提出的解决方案；</li>
+<li>各有应用场景。</li>
+</ul>
+</li>
+<li>三个火枪手：分工的粒度，稳定的备份，有效的讨论；主要应用于微服务设计和开发阶段。</li>
+<li>拆分方法：基于业务逻辑拆分，基于可扩展拆分，基于可靠性拆分，基于性能拆分，以上自由排列组合。</li>
+<li>基础设施：服务发现、服务路由、服务容错、服务监控、服务跟踪、服务安全、自动化测试、自动化部署、配置中心、接口框架、API网关。</li>
+</ul>
+</li>
+<li><p>微内核架构</p>
+<ul>
+<li>微内核架构也称为插件化架构，通用用于实现基于产品的应用。</li>
+<li>两类组件：核心系统（和具体业务无关的通用功能），插件模块（实现具体的业务逻辑）。</li>
+<li>OSGi架构：具备动态化、热插拔、高可复用性、高效性、扩展方便等优点，首选的插件化标准，当作一个微内核的架构模式。</li>
+<li>规则引擎架构：规则就是微内核架构的插件，引擎就是微内核架构的内核。</li>
+</ul>
+</li>
+</ul>
+<p>by xuyuanfa</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>AQS同步器原理分析</title>
+    <url>/2019/10/14/AQS%E5%90%8C%E6%AD%A5%E5%99%A8%E5%8E%9F%E7%90%86%E5%88%86%E6%9E%90/</url>
+    <content><![CDATA[<ul>
+<li><a href="##1">了解AQS</a></li>
+<li><a href="##2">AQS实现基础</a></li>
+<li><a href="##3">独占锁实现</a></li>
+<li><a href="##4">共享锁实现</a></li>
+<li><a href="##5">独占锁与共享锁最大的区别</a></li>
+<li><a href="##6">获取锁的一些区别</a></li>
+<li><a href="##7">条件协作</a></li>
+<li><a href="##8">链表入队实现</a><a id="more"></a>
+
+
+
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="了解AQS"><a href="#了解AQS" class="headerlink" title="了解AQS"></a>了解AQS</h3><p>AQS 提供了两种锁，分别是独占锁和共享锁。</p>
+<ul>
+<li>独占锁，线程间互斥的独占操作，比如 ReentrantLock。</li>
+<li>共享锁，多个线程共享操作直到触发场景条件，比如 CountDownLatch 和 Semaphore 等同步工具。</li>
+</ul>
+<p><span id="#2"></span></p>
+<h3 id="AQS实现基础"><a href="#AQS实现基础" class="headerlink" title="AQS实现基础"></a>AQS实现基础</h3><p><strong>锁的同步状态state ：</strong></p>
+<ul>
+<li>由实现类操作state，利用state实现不同场景，AQS自身不操作改变state。</li>
+<li>独占锁（以ReentrantLock为例）<ul>
+<li>当state &gt; 0 为有锁状态，当前线程每次重入加锁 state加 1，即代表当前持有锁的线程加了 state 次锁，反之解锁时每次减一；有锁状态下AQS处理其他线程入队（链表）等待。</li>
+<li>当 statte = 0 为无锁状态。</li>
+</ul>
+</li>
+<li>共享锁<ul>
+<li>不同场景state的用法不一样。</li>
+</ul>
+</li>
+</ul>
+<p><strong>节点的状态waitStatus：</strong></p>
+<ul>
+<li>CANCELLED（1）：取消状态，如果当前线程的前置节点状态为 CANCELLED，则表明前置节点已经等待超时或者已经被中断了，这时需要将其从等待队列中删除。</li>
+<li>SIGNAL（-1）：等待触发状态，如果当前线程的前置节点状态为 SIGNAL，则表明当前线程需要阻塞。</li>
+<li>CONDITION（-2）：等待条件状态，表示当前节点在等待 condition，即在 condition 队列中。</li>
+<li>PROPAGATE（-3）：状态需要向后传播，表示 releaseShared 需要被传播给后续节点，仅在共享锁模式下使用。</li>
+<li>0（0）：以上都不是。</li>
+</ul>
+<p><strong>AQS 的结构大概可总结为以下 3 部分：</strong></p>
+<ul>
+<li>用 volatile 修饰的整数类型的 state 状态，用于表示同步状态，提供 getState 和 setState 来操作同步状态；</li>
+<li>提供了一个 FIFO 等待队列，实现线程间的竞争和等待，这是 AQS 的核心；</li>
+<li>AQS 内部提供了各种基于 CAS 原子操作方法，如 compareAndSetState 方法，并且提供了锁操作的acquire和release方法。</li>
+</ul>
+<p><span id="#3"></span></p>
+<h3 id="独占锁实现"><a href="#独占锁实现" class="headerlink" title="独占锁实现"></a>独占锁实现</h3><p><strong>独占锁获取锁：</strong></p>
+<ol>
+<li>尝试获取锁tryAcquire，成功则返回（ReentrantLock会操作state加1），否则添加节点到链表；</li>
+<li>尾节点为空时，new Node()空节点初始化为头尾节点，并加入当前线程节点至尾节点；</li>
+<li>尾节点不为空时，当前线程节点CAS操作加入尾节点，自旋直至成功；<br>（加入尾节点的过程需要CAS+自旋，头节点可能被抢先初始化、前置节点可能被释放）</li>
+<li>添加完节点，从队列自旋获取锁，当前线程节点的前置节点是头节点时，尝试获取锁（头节点可能刚好释放锁），失败或前置非头节点则挂起等待（线程中断或超时时取消节点，如果前置节点已被取消，则移除节点前已被取消的节点，继续自旋）；</li>
+<li>释放锁唤起线程继续第4步的自旋；</li>
+<li>锁状态state为0时获取锁成功，state加1，移除头节点；</li>
+<li>当异常跳出自旋，取消节点。</li>
+</ol>
+<p><strong>独占锁释放锁：</strong></p>
+<ol>
+<li>尝试释放锁tryRelease，实现类操作state（ReentrantLock会操作state减1）；</li>
+<li>锁状态state为0时，释放成功，处理唤醒节点线程；</li>
+<li>当头节点头节点不为空且状态waitStatus不为0时（标注1），进入唤醒；</li>
+<li>当头节点状态waitStatus小于0时则设置为0，将头节点的后继节点唤醒，如果后继节点为空或已被取消，则从尾节点向前遍历到最后一个可唤醒节点。<blockquote>
+<p>标注1：个人理解，不唤醒初始化状态头节点的后继节点，分析代码也不会冲突，但没必要。第一次锁等待时，头尾节点为同一个初始化节点，并立即自旋尝试获取锁，第一次尝试未成功也会修改waitStatus为SIGNAL，只有在前置节点状态是SIGNAL时后继节点才会挂起。因此，头节点状态是0时，后继节点还没挂起，甚至正在加入链表。</p>
+</blockquote>
+</li>
+</ol>
+<p><span id="#4"></span></p>
+<h3 id="共享锁实现"><a href="#共享锁实现" class="headerlink" title="共享锁实现"></a>共享锁实现</h3><p><strong>共享锁获取锁：</strong></p>
+<ol>
+<li>尝试获取锁tryAcquireShared，成功则返回（视场景而定），否则添加节点到链表；</li>
+<li>同独占锁获取锁的步骤2/3/4/5；</li>
+<li>不同场景不同实现，尝试获取锁满足条件时成功，移除头节点，当需要向后传播时，释放共享锁唤醒节点线程，成功则可继续唤醒节点线程（标注2）（标注3）。</li>
+<li>当异常跳出自旋，取消节点。<blockquote>
+<p>标注2：因为唤醒节点，传播并发唤醒，唤醒的节点可能抢先移除头节点；<br>标注3：例如信号量一次性释放n个，则需传播唤醒链表中的节点:</p>
+</blockquote>
+</li>
+</ol>
+<p><strong>共享锁释放锁：</strong></p>
+<ol>
+<li>尝试释放锁tryReleaseShared，成功（视场景而定）则唤醒链表中节点；</li>
+<li>唤醒头节点线程，尝试获取锁去修改锁状态state；</li>
+<li>成功则可继续唤醒节点线程（标注2）。</li>
+</ol>
+<p><strong>一些共享锁实现的原理：</strong></p>
+<ul>
+<li>读写锁：</li>
+</ul>
+<ol>
+<li>以锁状态state的高16位保存读锁状态，低16位保存写锁状态；</li>
+<li>读锁是共享锁，读读不互斥，高16位保存读锁获取数，当低16位大于0且不是当前线程时，存在写锁互斥；</li>
+</ol>
+<ul>
+<li>闭锁：</li>
+</ul>
+<ol>
+<li>以锁状态state保存闭锁count数目；</li>
+<li>每一次await创建线程节点添加至共享锁等待链表，并挂起等待；</li>
+<li>每一次countDown仅处理state减1，为0时唤醒等待线程，并传播唤醒所有等待节点；</li>
+</ol>
+<ul>
+<li>信号量：</li>
+</ul>
+<ol>
+<li>锁状态state保存可用的信号量数目；</li>
+<li>每一次acquire处理state减n，当state等于0时不处理减1，为0时才创建线程节点添加至共享锁等待链表，并挂起等待；</li>
+<li>每一次release处理state加n，唤醒等待线程，并传播唤醒所有等待节点，仅有n能成功，其他继续挂起；</li>
+</ol>
+<p><span id="#5"></span></p>
+<h3 id="独占锁与共享锁最大的区别"><a href="#独占锁与共享锁最大的区别" class="headerlink" title="独占锁与共享锁最大的区别"></a>独占锁与共享锁最大的区别</h3><ol>
+<li>独占锁是唤醒线程抢占锁排斥继续工作，头节点表示成功抢占锁的工作线程；</li>
+<li>共享锁是唤醒线程释放节点，让锁状态state能够满足场景条件而继续工作；</li>
+</ol>
+<p><span id="#6"></span></p>
+<h3 id="获取锁的一些区别"><a href="#获取锁的一些区别" class="headerlink" title="获取锁的一些区别"></a>获取锁的一些区别</h3><ul>
+<li>默认获取锁：当线程被中断，设置中断标志，不会抛出异常；</li>
+<li>可中断获取锁：当线程被中断，抛出中断异常；</li>
+<li>可超时获取锁：当线程等待超时，返回false，当线程被中断，抛出中断异常；</li>
+</ul>
+<p><span id="#7"></span></p>
+<h3 id="条件协作"><a href="#条件协作" class="headerlink" title="条件协作"></a>条件协作</h3><p>用于独占锁，挂起线程并释放锁。</p>
+<ul>
+<li>ConditionObject.await</li>
+</ul>
+<ol>
+<li>创建线程节点加入条件等待链表；</li>
+<li>一次性释放state为0（每次重入锁state加1），即释放锁；</li>
+<li>挂起线程，等待signal把线程节点加入等待链表；</li>
+<li>线程被唤醒后，执行获取独占锁，一次性把state加回去。</li>
+</ol>
+<ul>
+<li>ConditionObject.signal</li>
+</ul>
+<ol>
+<li>取出条件对象中的第一个线程节点，加入锁等待链表；</li>
+<li>如果前置节点被取消，或状态被改，唤醒当前线程继续执行await（标注4）；<blockquote>
+<p>标注4：个人理解，处理前置节点线程被中断取消的情况，提前唤醒线程执行获取独占锁，清除被取消的节点。</p>
+</blockquote>
+</li>
+</ol>
+<p><span id="#8"></span></p>
+<h3 id="链表入队实现"><a href="#链表入队实现" class="headerlink" title="链表入队实现"></a>链表入队实现</h3><ol>
+<li>创建当前线程节点；</li>
+<li>为了更快，先判断链表不为空时，直接入队（这里的快只是少了个循环指令吧，源码注释// Try the fast path of enq）；</li>
+<li>当链表为空时，初始化链表，头节点为无线程的new Node()（可理解为持有锁正在执行的线程，但不知道是谁，反正就是要排在它后面）；</li>
+<li>当链表不为空时，直接入队；</li>
+</ol>
+<p>by xuyuanfa</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>Redis主从同步如何传输数据</title>
+    <url>/2019/10/14/Redis%E4%B8%BB%E4%BB%8E%E5%90%8C%E6%AD%A5%E5%A6%82%E4%BD%95%E4%BC%A0%E8%BE%93%E6%95%B0%E6%8D%AE/</url>
+    <content><![CDATA[<ul>
+<li><a href="##1">三个阶段</a></li>
+<li><a href="##2">全量复制</a></li>
+<li><a href="##3">部分复制</a></li>
+<li><a href="##4">命令传播阶段的心跳机制</a></li>
+<li><a href="##5">注意事项</a></li>
+<li><a href="##6">小结</a></li>
+<li><a href="##7">问题</a><a id="more"></a>
+
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="三个阶段"><a href="#三个阶段" class="headerlink" title="三个阶段"></a>三个阶段</h3><p><strong>连接建立阶段</strong></p>
+<ul>
+<li>步骤1：保存主节点信息</li>
+<li>步骤2：建立socket连接</li>
+<li>步骤3：发送ping命令</li>
+<li>步骤4：身份验证</li>
+<li>步骤5：发送从节点端口信息</li>
+</ul>
+<p><strong>数据同步阶段</strong></p>
+<ul>
+<li>从节点向主节点发送psync命令（Redis2.8以前是sync命令），开始同步。</li>
+<li>根据主从节点当前状态的不同，可以分为全量复制和部分复制</li>
+<li>在数据同步阶段和后面的命令传播阶段，主节点需要主动向从节点发送请求（如推送缓冲区中的写命令），才能完成复制。</li>
+</ul>
+<p><strong>命令传播阶段</strong></p>
+<ul>
+<li>主节点将自己执行的写命令发送给从节点，从节点接收命令并执行，从而保证主从节点数据的一致性。</li>
+<li>命令传播是异步的过程，即主节点发送写命令后并不会等待从节点的回复。</li>
+<li>可配置tcp延迟，合并数据发送。</li>
+</ul>
+<p><span id="#2"></span></p>
+<h3 id="全量复制"><a href="#全量复制" class="headerlink" title="全量复制"></a>全量复制</h3><ol>
+<li>主节点收到全量复制的命令后，执行bgsave，在后台生成RDB文件，并使用一个缓冲区（称为复制缓冲区）记录从现在开始执行的所有写命令。</li>
+<li>主节点的bgsave执行完成后，将RDB文件发送给从节点；从节点首先清除自己的旧数据，然后载入接收的RDB文件，将数据库状态更新至主节点执行bgsave时的数据库状态。</li>
+<li>主节点将前述复制缓冲区中的所有写命令发送给从节点，从节点执行这些写命令，将数据库状态更新至主节点的最新状态。</li>
+<li>如果从节点开启了AOF，则会触发bgrewriteaof的执行，从而保证AOF文件更新至主节点的最新状态。</li>
+</ol>
+<p>全量复制是非常重型的操作：<br>（1）主节点通过bgsave命令fork子进程进行RDB持久化，该过程是非常消耗CPU、内存(页表复制)、硬盘IO的；<br>（2）主节点通过网络将RDB文件发送给从节点，对主从节点的带宽都会带来很大的消耗<br>（3）从节点清空老数据、载入新RDB文件的过程是阻塞的，无法响应客户端的命令；如果从节点执行bgrewriteaof，也会带来额外的消耗</p>
+<p><span id="#3"></span></p>
+<h3 id="部分复制"><a href="#部分复制" class="headerlink" title="部分复制"></a>部分复制</h3><p>（1）复制偏移量<br>主节点和从节点分别维护一个复制偏移量（offset），代表的是主节点向从节点传递的字节数。</p>
+<p>（2）复制积压缓冲区</p>
+<ul>
+<li>复制积压缓冲区是由主节点维护的、固定长度的、先进先出FIFO队列，默认大小1MB；当主节点开始有从节点时创建，其作用是备份主节点最近发送给从节点的数据。注意，无论主节点有一个还是多个从节点，都只需要一个复制积压缓冲区。</li>
+<li>在命令传播阶段，主节点除了将写命令发送给从节点，还会发送一份给复制积压缓冲区，作为写命令的备份；除了存储写命令，复制积压缓冲区中还存储了其中的每个字节对应的复制偏移量（offset）。由于复制积压缓冲区定长且是先进先出，所以它保存的是主节点最近执行的写命令；时间较早的写命令会被挤出缓冲区。（用于网络中断时继续部分复制）</li>
+<li>从节点将offset发送给主节点后，主节点根据offset和缓冲区大小决定能否执行部分复制：<ul>
+<li>a.如果offset偏移量之后的数据，仍然都在复制积压缓冲区里，则执行部分复制；</li>
+<li>b.如果offset偏移量之后的数据已不在复制积压缓冲区中（数据已被挤出），则执行全量复制。</li>
+</ul>
+</li>
+</ul>
+<p>（3）服务器运行ID(runid)</p>
+<ul>
+<li>每个Redis节点(无论主从)，在启动时都会自动生成一个随机ID(每次启动都不一样)，由40个随机的十六进制字符组成；runid用来唯一识别一个Redis节点。通过info Server命令，可以查看节点的runid.</li>
+<li>主从节点初次复制时，主节点将自己的runid发送给从节点，从节点将这个runid保存起来；当断线重连时，从节点会将这个runid发送给主节点；主节点根据runid判断能否进行部分复制.</li>
+</ul>
+<p><span id="#4"></span></p>
+<h3 id="命令传播阶段的心跳机制"><a href="#命令传播阶段的心跳机制" class="headerlink" title="命令传播阶段的心跳机制"></a>命令传播阶段的心跳机制</h3><ul>
+<li>主-&gt;从：PING<br>每隔指定的时间，主节点会向从节点发送PING命令，这个PING命令的作用，主要是为了让从节点进行超时判断。默认10秒。</li>
+<li>从-&gt;主：REPLCONF ACK<br>在命令传播阶段，从节点会向主节点发送REPLCONF ACK命令，频率是每秒1次。<br>（1）实时监测主从节点网络状态：该命令会被主节点用于复制超时的判断。<br>（2）检测命令丢失：从节点发送了自身的offset，主节点会与自己的offset对比，如果从节点数据缺失（如网络丢包），主节点会推送缺失的数据（这里也会利用复制积压缓冲区）。注意，offset和复制积压缓冲区，不仅可以用于部分复制，也可以用于处理命令丢失等情形；区别在于前者是在断线重连后进行的，而后者是在主从节点没有断线的情况下进行的。<br>（3）辅助保证从节点的数量和延迟：Redis主节点中使用min-slaves-to-write和min-slaves-max-lag参数，来保证主节点在不安全的情况下不会执行写命令；所谓不安全，是指从节点数量太少，或延迟过高。例如min-slaves-to-write和min-slaves-max-lag分别是3和10，含义是如果从节点数量小于3个，或所有从节点的延迟值都大于10s，则主节点拒绝执行写命令。</li>
+</ul>
+<p><strong>超时判断</strong></p>
+<ul>
+<li>如果主节点判断连接超时，其会释放相应从节点的连接。</li>
+<li>如果从节点判断连接超时，则可以及时重新建立连接，避免与主节点数据长期的不一致。</li>
+</ul>
+<p><span id="#5"></span></p>
+<h3 id="注意事项"><a href="#注意事项" class="headerlink" title="注意事项"></a>注意事项</h3><p>（1）数据同步阶段：在主从节点进行全量复制bgsave时，主节点需要首先fork子进程将当前数据保存到RDB文件中，然后再将RDB文件通过网络传输到从节点。如果RDB文件过大，主节点在fork子进程+保存RDB文件时耗时过多，可能会导致从节点长时间收不到数据而触发超时；此时从节点会重连主节点，然后再次全量复制，再次超时，再次重连……这是个悲伤的循环。为了避免这种情况的发生，除了注意Redis单机数据量不要过大，另一方面就是适当增大repl-timeout值，具体的大小可以根据bgsave耗时来调整。<br>（2）命令传播阶段：如前所述，在该阶段主节点会向从节点发送PING命令，频率由repl-ping-slave-period控制；该参数应明显小于repl-timeout值(后者至少是前者的几倍)。否则，如果两个参数相等或接近，网络抖动导致个别PING命令丢失，此时恰巧主节点也没有向从节点发送数据，则从节点很容易判断超时。<br>（3）慢查询导致的阻塞：如果主节点或从节点执行了一些慢查询（如keys *或者对大数据的hgetall等），导致服务器阻塞；阻塞期间无法响应复制连接中对方节点的请求，可能导致复制超时。<br>（4）复制缓冲区溢出，复制缓冲区是客户端输出缓冲区的一种，主节点会为每一个从节点分别分配复制缓冲区；而复制积压缓冲区则是一个主节点只有一个，无论它有多少个从节点。<br>（5）单机内存大小限制，单机内存过大可能造成的影响：切主、从库扩容、缓冲区溢出、超时。最好只使用50%-65%的内存，留下30%-45%的内存用于执行bgsave命令和创建复制缓冲区等。</p>
+<blockquote>
+<p>复制缓冲区：该缓冲区存放的数据包括了以下几个时间段内主节点执行的写命令：bgsave生成RDB文件、RDB文件由主节点发往从节点、从节点清空老数据并载入RDB文件中的数据。由client-output-buffer-limit配置。</p>
+</blockquote>
+<p><span id="#6"></span></p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><ul>
+<li>主从复制的作用：宏观的了解主从复制是为了解决什么样的问题，即数据冗余、故障恢复、读负载均衡等。</li>
+<li>主从复制的原理：主从复制包括了连接建立阶段、数据同步阶段、命令传播阶段；其中数据同步阶段，有全量复制和部分复制两种数据同步方式；命令传播阶段，主从节点之间有PING和REPLCONF ACK命令互相进行心跳检测。</li>
+</ul>
+<p><a href="https://www.cnblogs.com/kismetv/p/9236731.html#t33" target="_blank" rel="noopener">https://www.cnblogs.com/kismetv/p/9236731.html#t33</a></p>
+<p><span id="#7"></span></p>
+<h3 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h3><p><strong>redis从节点什么情况下会发送offset给主节点？</strong></p>
+<ul>
+<li>offset用于判断主从节点的数据库状态是否一致。</li>
+<li>断线连接后，从节点发送命令psync <runid> <offset>，主节点根据offset和缓冲区大小决定能否执行部分复制：<ul>
+<li>如果offset偏移量之后的数据，仍然都在复制积压缓冲区里，则执行部分复制；</li>
+<li>如果offset偏移量之后的数据已不在复制积压缓冲区中（数据已被挤出），则执行全量复制。<ul>
+<li>在命令传播阶段，从节点会向主节点发送REPLCONF ACK命令，频率是每秒1次；命令格式为：REPLCONF ACK {offset}，其中offset指从节点保存的复制偏移量。其作用：<br>（1）实时监测主从节点网络状态<br>（2）检测命令丢失：从节点发送了自身的offset，主节点会与自己的offset对比，如果从节点数据缺失（如网络丢包），主节点会推送缺失的数据（这里也会利用复制积压缓冲区）。注意，offset和复制积压缓冲区，不仅可以用于部分复制，也可以用于处理命令丢失等情形；区别在于前者是在断线重连后进行的，而后者是在主从节点没有断线的情况下进行的。<br>（3）辅助保证从节点的数量和延迟</li>
+</ul>
+</li>
+</ul>
+</offset></runid></li>
+</ul>
+<p>by xuyuanfa</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>Redis缓存浓缩篇</title>
+    <url>/2019/10/14/Redis%E7%BC%93%E5%AD%98%E6%B5%93%E7%BC%A9%E7%AF%87/</url>
+    <content><![CDATA[<ul>
+<li><a href="##1">Redis数据类型</a></li>
+<li><a href="##2">Redis数据存储</a></li>
+<li><a href="##3">Redis主从配置</a></li>
+<li><a href="##4">哨兵sentinel</a></li>
+<li><a href="##5">哈希槽</a></li>
+<li><a href="##6">集群</a></li>
+<li><a href="##7">Redis持久化</a></li>
+<li><a href="##8">分布式锁</a></li>
+<li><a href="##9">了解Reids多路复用</a><a id="more"></a>
+
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="Redis数据类型"><a href="#Redis数据类型" class="headerlink" title="Redis数据类型"></a>Redis数据类型</h3><p>string,list,set及zset(sorted set)和Hash。</p>
+<p><span id="#2"></span></p>
+<h3 id="Redis数据存储"><a href="#Redis数据存储" class="headerlink" title="Redis数据存储"></a><strong>Redis数据存储</strong></h3><ul>
+<li>redis的存储分为内存存储、磁盘存储和log文件三部分，配置文件中有三个参数对其进行配置。</li>
+<li>save seconds updates，save配置，指出在多长时间内，有多少次更新操作，就将数据同步到数据文件。这个可以多个条件配合，比如默认配置文件中的设置，就设置了三个条件。</li>
+<li>appendonly yes/no ，appendonly配置，指出是否在每次更新操作后进行日志记录，如果不开启，可能会在断电时导致一段时间内的数据丢失。因为redis本身同步数据文件是按上面的save条件来同步的，所以有的数据会在一段时间内只存在于内存中。</li>
+<li>appendfsync no/always/everysec ，appendfsync配置，no表示等操作系统进行数据缓存同步到磁盘，always表示每次更新操作后手动调用fsync()将数据写到磁盘，everysec表示每秒同步一次。</li>
+</ul>
+<p><span id="#3"></span></p>
+<h3 id="Redis主从配置"><a href="#Redis主从配置" class="headerlink" title="Redis主从配置"></a>Redis主从配置</h3><p>redis支持master-slave的主从配置，配置方法是在从机的配置文件中指定slaveof参数为主机的ip和port即可。</p>
+<p><span id="#4"></span></p>
+<h3 id="哨兵sentinel"><a href="#哨兵sentinel" class="headerlink" title="哨兵sentinel"></a>哨兵sentinel</h3><p>redis的sentinel系统用于管理多个redis服务器，该系统主要执行三个任务：监控、提醒、自动故障转移。</p>
+<ol>
+<li>监控（Monitoring）： Redis Sentinel实时监控主服务器和从服务器运行状态，并且实现自动切换。</li>
+<li>提醒（Notification）：当被监控的某个 Redis 服务器出现问题时， Redis Sentinel 可以向系统管理员发送通知， 也可以通过 API 向其他程序发送通知。</li>
+<li>自动故障转移（Automatic failover）： 当一个主服务器不能正常工作时，Redis Sentinel 可以将一个从服务器升级为主服务器， 并对其他从服务器进行配置，让它们使用新的主服务器。当应用程序连接Redis 服务器时， Redis Sentinel会告之新的主服务器地址和端口。</li>
+</ol>
+<blockquote>
+<p>注意：在使用sentinel监控主从节点的时候，从节点需要是使用动态方式配置的，如果直接修改配置文件，后期sentinel实现故障转移的时候会出问题。</p>
+</blockquote>
+<p><span id="#5"></span></p>
+<h3 id="哈希槽"><a href="#哈希槽" class="headerlink" title="哈希槽"></a>哈希槽</h3><p>一个 Redis 集群包含 16384 个哈希槽（hash slot），数据库中的每个数据都属于这16384个哈希槽中的一个。集群使用公式 CRC16(key) % 16384 来计算键 key 属于哪个槽。集群中的每一个节点负责处理一部分哈希槽。<br>哈希槽的好处：</p>
+<ol>
+<li>便于添加删除节点，只需处理槽位的转移，但不会自动进行，需要人工配置；</li>
+<li>对比一致性哈希，扩展节点需要重新哈希分配数据，哈希槽更便于扩展节点；</li>
+<li>由用户自己定义分配。例如机器硬盘小的，可以分配少一点槽位，硬盘大的可以分配多一点。</li>
+</ol>
+<p><span id="#6"></span></p>
+<h3 id="集群"><a href="#集群" class="headerlink" title="集群"></a>集群</h3><ul>
+<li><p>集群至少需要3主3从，且每个实例使用不同的配置文件，主从不用配置，集群会自己选。</p>
+</li>
+<li><p>集群中的每个节点都有1个至N个复制品，其中一个为主节点，其余的为从节点，如果主节点下线了，集群就会把这个主节点的一个从节点设置为新的主节点，继续工作。</p>
+</li>
+<li><p>修改拷贝的redis.conf文件，配置开启集群，修改端口</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">daemonize yes</span><br><span class="line">port 6379 #只有端口不同，其他相同</span><br><span class="line">cluster-enabled yes</span><br><span class="line">cluster-config-file nodes.conf</span><br><span class="line">cluster-node-timeout 5000</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>根据添加节点类型的不同，有两种方法来添加新节点</p>
+</li>
+</ul>
+<ol>
+<li>主节点：创建一个空节点，启动节点，加入集群，使用redis-trib程序，将集群中的某些哈希槽移动到新节点里面；</li>
+<li>从节点：创建一个空节点，启动节点，加入集群，使用redis-cli命令把这个新节点设置成集群中某个主节点的复制品。</li>
+</ol>
+<p><span id="#7"></span></p>
+<h3 id="Redis持久化"><a href="#Redis持久化" class="headerlink" title="Redis持久化"></a>Redis持久化</h3><p>目前Redis持久化的方式有两种： RDB 和 AOF</p>
+<p><strong>RDB</strong></p>
+<ul>
+<li>RDB就是Snapshot快照存储，是默认的持久化方式。</li>
+<li>可理解为半持久化模式，即按照一定的策略周期性的将数据保存到磁盘。</li>
+<li>对应产生的数据文件为dump.rdb，通过配置文件中的save参数来定义快照的周期。</li>
+</ul>
+<p>下面是默认的快照设置：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">save 900 1    #当有一条Keys数据被改变时，900秒刷新到Disk一次</span><br><span class="line">save 300 10   #当有10条Keys数据被改变时，300秒刷新到Disk一次</span><br><span class="line">save 60 10000 #当有10000条Keys数据被改变时，60秒刷新到Disk一次</span><br></pre></td></tr></table></figure>
+
+<p>Redis的RDB文件不会坏掉，因为其写操作是在一个新进程中进行的。<br>RDB有它的不足，就是一旦数据库出现问题，那么我们的RDB文件中保存的数据并不是全新的。从上次RDB文件生成到Redis停机这段时间的数据全部丢掉了。</p>
+<p><strong>AOF</strong></p>
+<ul>
+<li>AOF(Append-Only File)比RDB方式有更好的持久化性。</li>
+<li>由于在使用AOF持久化方式时，Redis会将每一个收到的写命令都通过Write函数追加到文件中，类似于MySQL的binlog。</li>
+<li>当Redis重启是会通过重新执行文件中保存的写命令来在内存中重建整个数据库的内容。</li>
+</ul>
+<p>对应的设置参数为：<br>$ vim /opt/redis/etc/redis_6379.conf</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">appendonly yes       #启用AOF持久化方式</span><br><span class="line">appendfilename appendonly.aof #AOF文件的名称，默认为appendonly.aof</span><br><span class="line"># appendfsync always #每次收到写命令就立即强制写入磁盘，是最有保证的完全的持久化，但速度也是最慢的，一般不推荐使用。</span><br><span class="line">appendfsync everysec #每秒钟强制写入磁盘一次，在性能和持久化方面做了很好的折中，是受推荐的方式。</span><br><span class="line"># appendfsync no     #完全依赖OS的写入，一般为30秒左右一次，性能最好但是持久化最没有保证，不被推荐。</span><br></pre></td></tr></table></figure>
+
+<p><strong>压缩AOF</strong></p>
+<ul>
+<li>AOF的完全持久化方式同时也带来了另一个问题，持久化文件会变得越来越大。</li>
+<li>比如我们调用INCR test命令100次，文件中就必须保存全部的100条命令，但其实99条都是多余的。</li>
+<li>因为要恢复数据库的状态其实文件中保存一条SET test 100就够了。</li>
+<li>为了压缩AOF的持久化文件，Redis提供了bgrewriteaof命令。</li>
+<li>收到此命令后Redis将使用与快照类似的方式将内存中的数据以命令的方式保存到临时文件中，最后替换原来的文件，以此来实现控制AOF文件的增长。</li>
+<li>由于是模拟快照的过程，因此在重写AOF文件时并没有读取旧的AOF文件，而是将整个内存中的数据库内容用命令的方式重写了一个新的AOF文件。</li>
+</ul>
+<p>对应的设置参数为:<br>$ vim /opt/redis/etc/redis_6379.conf</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">no-appendfsync-on-rewrite yes   #在日志重写时，不进行命令追加操作，而只是将其放在缓冲区里，避免与命令的追加造成DISK IO上的冲突。</span><br><span class="line">auto-aof-rewrite-percentage 100 #当前AOF文件大小是上次日志重写得到AOF文件大小的二倍时，自动启动新的日志重写过程。</span><br><span class="line">auto-aof-rewrite-min-size 64mb  #当前AOF文件启动新的日志重写过程的最小值，避免刚刚启动Reids时由于文件尺寸较小导致频繁的重写。</span><br></pre></td></tr></table></figure>
+
+<p><strong>在数据恢复方面：</strong><br>RDB的启动时间会更短，原因有两个：</p>
+<ul>
+<li>一是RDB文件中每一条数据只有一条记录，不会像AOF日志那样可能有一条数据的多次操作记录。所以每条数据只需要写一次就行了。</li>
+<li>另一个原因是RDB文件的存储格式和Redis数据在内存中的编码格式是一致的，不需要再进行数据编码工作，所以在CPU消耗上要远小于AOF日志的加载。</li>
+</ul>
+<p>目前，通常的设计思路是利用Replication机制来弥补aof、snapshot性能上的不足，达到了数据可持久化。</p>
+<ul>
+<li>即Master上Snapshot和AOF都不做，来保证Master的读写性能，而Slave上则同时开启Snapshot和AOF来进行持久化，保证数据的安全性。</li>
+<li>可以在Slave上仅开启Snapshot来进行本地化，同时可以考虑将save中的频率调高一些或者调用一个计划任务来进行定期bgsave的快照存储，来尽可能的保障本地化数据的完整性。</li>
+<li>在这样的架构下，如果仅仅是Master挂掉，Slave完整，数据恢复可达到100%。</li>
+</ul>
+<p><a href="https://blog.csdn.net/u011204847/article/details/51307044" target="_blank" rel="noopener">https://blog.csdn.net/u011204847/article/details/51307044</a></p>
+<p><span id="#8"></span></p>
+<h3 id="分布式锁"><a href="#分布式锁" class="headerlink" title="分布式锁"></a>分布式锁</h3><p>需满足条件：</p>
+<ol>
+<li>原子性操作，保证只有一个客户端线程能获取锁；</li>
+<li>避免死锁，设置过期时间主动解锁，解决异常中断后长期持有锁；</li>
+<li>正确释放锁，设置value值，保证释放锁是当前持有锁；</li>
+<li>容错性，单节点实现分布式锁有风险，缓存集群存在宕机的可能，大多数节点正常工作实现锁（宕机重启后节点够多，这过程而导致同时多个客户端持有锁，概率太小，人工介入即可）；</li>
+</ol>
+<p><strong>实现方法思路</strong><br><strong>一、获取锁</strong></p>
+<ol>
+<li>key，固定值，基于setnx命令；</li>
+<li>value，随机数或requestId（UUID），用于释放锁，解铃还须系铃人；</li>
+<li>expireTime，设置过期时间，用于强制释放锁，避免死锁；</li>
+<li>封装方法实现在多个节点成功获取锁，超过半数则成功，否则失败并删除键值；</li>
+</ol>
+<p><strong>二、释放锁</strong></p>
+<ol>
+<li>key，同获取锁；</li>
+<li>value，同获取锁，只有一致才能释放；</li>
+<li>脚本实现对比value值和删除锁。原子性操作，redis支持lua脚本；</li>
+</ol>
+<p><strong>三、锁等待</strong></p>
+<ol>
+<li>持有锁较久，睡眠循环等待；</li>
+<li>设置超时等待，限时内获取不到锁返回失败；</li>
+</ol>
+<p><span id="#9"></span></p>
+<h3 id="了解Reids多路复用"><a href="#了解Reids多路复用" class="headerlink" title="了解Reids多路复用"></a>了解Reids多路复用</h3><ul>
+<li>I/O 多路复用模块封装了底层的 select、epoll、avport 以及 kqueue 这些 I/O 多路复用函数，为上层提供了相同的接口。</li>
+<li>Redis 会优先选择时间复杂度为 $O(1)$ 的 I/O 多路复用函数作为底层实现，包括 Solaries 10 中的 evport、Linux 中的 epoll 和 macOS/FreeBSD 中的 kqueue，上述的这些函数都使用了内核内部的结构，并且能够服务几十万的文件描述符。</li>
+<li>但是如果当前编译环境没有上述函数，就会选择 select 作为备选方案，由于其在使用时会扫描全部监听的描述符，所以其时间复杂度较差 $O(n)$，并且只能同时服务 1024 个文件描述符，所以一般并不会以 select 作为第一方案使用。</li>
+</ul>
+<p>by xuyuanfa</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>Spring之AOP和IoC浓缩篇</title>
+    <url>/2019/10/14/Spring%E4%B9%8BAOP%E5%92%8CIoC%E6%B5%93%E7%BC%A9%E7%AF%87/</url>
+    <content><![CDATA[<ul>
+<li><a href="##1">IoC控制反转</a></li>
+<li><a href="##2">AOP切面</a><a id="more"></a>
+
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="IoC控制反转"><a href="#IoC控制反转" class="headerlink" title="IoC控制反转"></a><strong>IoC控制反转</strong></h3><p><strong>基础</strong></p>
+<ul>
+<li>IoC容器是依赖控制反转的一种实现。对象生成或初始化时把数据注入到对象中，或对象注入到数据域。</li>
+<li>IoC容器是用来管理对象依赖关系的，BeanDefinition是对依赖反转模式中管理的对象依赖关系的数据抽象。</li>
+</ul>
+<p><strong>IoC容器具体表现，两个主要到容器系列：</strong></p>
+<ul>
+<li>BeanFactory接口实现的基本形式（默认基本实现DefaultListableBeanFactory）</li>
+<li>ApplicationContext高级表现形式</li>
+</ul>
+<p><strong>FactoryBean与BeanFactory</strong></p>
+<ul>
+<li>FactoryBean是对象工厂（IoC容器），BeanFactory是接口。</li>
+<li>使用容器时，用&amp;转义符获取FactoryBean本身，而非其产生的对象，作区分。</li>
+</ul>
+<p><strong>IoC容器的初始化过程</strong></p>
+<ol>
+<li>Resource定位</li>
+<li>BeanDefinition的载入和解析</li>
+<li>向IoC容器注册BeanDefinition</li>
+</ol>
+<p><strong>IoC容器的依赖注入</strong></p>
+<ul>
+<li>初始化过程只是建立整个Bean的配置信息，由beanDefiintionMap持有。</li>
+<li>第一次向IoC容器getBean时触发依赖注入的过程，也可通过设置lazy-init属性预实例化。</li>
+</ul>
+<ol>
+<li>getBean入口调用doGetBean</li>
+<li>createBean开始创建</li>
+<li>instantiate使用默认构造函数实例化，默认用SimpleInstantiationStrategy生成Bean对象，两种方式，调用BeanUtils使用JVM反射，另一种CGLIB。</li>
+<li>populateBean填充属性值</li>
+<li>resolveValueIfNecessary解析引用（递归getBean）、数组、Map、List、Set等类型</li>
+<li>BeanWraper的setPropertyValues完成属性注入</li>
+</ol>
+<p><span id="#2"></span></p>
+<h3 id="AOP切面"><a href="#AOP切面" class="headerlink" title="AOP切面"></a><strong>AOP切面</strong></h3><p><strong>基础</strong></p>
+<ul>
+<li>SpringAOP核心技术是动态代理，以动态代理为基础实现横切。</li>
+<li>一个通知器有多种类型的通知。</li>
+<li>一个通知切点匹配多个目标对象的方法。</li>
+</ul>
+<p><strong>基础要点</strong></p>
+<ul>
+<li>通知（Advice）：增强行为，通知类型（before、after、after-returning、after-throwing、around）</li>
+<li>切点（Pointcut）：需要增强的方法集合</li>
+<li>通知器（Advisor）：结合通知和切点</li>
+<li>切面（Aspect）：通知和切点的集合</li>
+<li>连接点（Join-Point）：一个应用执行过程中能够插入一个切面的点</li>
+<li>引入（Introduction） ：向现有的类中添加方法或属性</li>
+<li>织入（Weaving）：把切面应用到目标对象的过程；编译期改写字节码、类加载期增强目标类的字节码、运行期创建动态代理对象；SpringAOP是运行期。</li>
+</ul>
+<p><strong>AopProxy代理对象设计原理</strong></p>
+<p>ProxyFactoryBean生成AopProxy代理对象</p>
+<ol>
+<li>初始化通知器链</li>
+<li>读取配置中的所有通知器，如果是singleton类型从IoC容器getBean，如果是prototype类型则重新new通知器，加入通知器链中（advice或interceptor会被包装为通知器，其中interceptor必须实现MethodInterceptor接口）</li>
+<li>设置需要被代理的目标对象（含父类）的所有接口，目标对象也可能是一个接口</li>
+<li>生成代理对象，目标对象是接口类则使用JDK生成代理对象，否则使用CGLIB生成代理对象</li>
+</ol>
+<p><strong>AopProxy代理对象的回调</strong></p>
+<ol>
+<li>根据方法名和目标对象获取拦截器链</li>
+<li>生成当前方法的拦截器链（有缓存）</li>
+<li>判断是否持有拦截器链</li>
+<li>如果是表达式匹配类型，则是通知，匹配判断目标对象的当前方法是否满足匹配，满足则触发拦截器调用</li>
+<li>如果不是切点通知，则一定满足，直接触发拦截器调用</li>
+<li>递归调用处理拦截器链，直到遍历完整个拦截器链</li>
+</ol>
+<p><strong>疑问：</strong></p>
+<ol>
+<li>被代理的目标对象，如何在调用时进入代理对象？<br>自答：古老原始的代理方式是手动指定代理bean，而自动代理是IoC容器管理AOP实现的，关键位置AbstractAutowireCapableBeanFactory.initializeBean的applyBeanPostProcessorsAfterInitialization，该方法创建代理并返回了代理对象，自动代理创建者都实现了BeanPostProcessor接口。</li>
+<li>是否每个目标对象创建一个代理对象？<br>自答：是，有通知则为目标bean创建代理对象包装bean。</li>
+<li>私有方法能否被增强？<br>自答：private方法的增强需要用AspectJ织入字节码实现增强，Spring AOP的代理方式不可行。（JDK 动态代理基于接口，所以只有接口中的方法会被增强，而 CGLIB 基于类继承，需要注意就是如果方法使用了 final 修饰，或者是 private 方法，是不能被增强的。）</li>
+</ol>
+<p><strong>目前 Spring AOP 有三种配置方式：</strong></p>
+<ul>
+<li>Spring 1.2 基于接口的配置：最早的 Spring AOP 是完全基于几个接口的，想看源码的同学可以从这里起步。</li>
+<li>Spring 2.0 schema-based 配置：Spring 2.0 以后使用 XML 的方式来配置，使用命名空间 <aop></aop></li>
+<li>Spring 2.0 @AspectJ 配置：使用注解的方式来配置，虽然叫做 @AspectJ，但是这个和 AspectJ 其实没啥关系。</li>
+</ul>
+<p><strong>创建AOP代理对象的实现类</strong></p>
+<ul>
+<li>第一种基于接口配置，由ProxyFactoryBean配置需手动指定代理，由BeanNameAutoProxyCreator配置则能自动代理，还有更方便的DefaultAdvisorAutoProxyCreator。<br>BeanNameAutoProxyCreator 是自己匹配方法，然后交由内部配置 advice 来拦截处理；<br>而 DefaultAdvisorAutoProxyCreator 是让 ioc 容器中的所有 advisor 来匹配方法，advisor 内部都是有 advice 的，让它们内部的 advice 来执行拦截处理。 </li>
+<li>第二种基于aop命名空间配置，由AopNamespaceHandler解析。</li>
+<li>第三种基于@AspectJ注解注入，由AnnotationAwareAspectJAutoProxyCreator创建。<br><img src="https://user-images.githubusercontent.com/11657320/66559589-35129280-eb88-11e9-8d2f-a91b78519f1a.png" alt="image"></li>
+</ul>
+<p><a href="https://www.javadoop.com/post/spring-aop-intro" target="_blank" rel="noopener">https://www.javadoop.com/post/spring-aop-intro</a></p>
+<p><strong>配置参考：</strong></p>
+<ul>
+<li><p>基于通知器，先定义通知器类实现需要的通知接口，弊端是不可指定生效通知，用了该通知器就会启用其中实现的所有通知。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&lt;aop:config&gt;</span><br><span class="line">    &lt;aop:pointcut id=&quot;test&quot; expression=&quot;execution(* com.demo.TestPoint.test())&quot;/&gt;</span><br><span class="line">    &lt;aop:advisor advice-ref=&quot;advisorTest&quot; pointcut-ref=&quot;test&quot;/&gt;</span><br><span class="line">&lt;/aop:config&gt;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>基于定义切面，先定义增强类实现增强方法（无需实现通知接口），切点匹配匹配目标对象方法，通知指定增强方法，切点+通知=切面。</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&lt;aop:config&gt;</span><br><span class="line">    &lt;aop:aspect ref=&quot;aspectTest&quot;&gt;</span><br><span class="line">        &lt;aop:pointcut id=&quot;test&quot; expression=&quot;execution(* com.demo.TestPoint.test())&quot;/&gt;</span><br><span class="line">        &lt;aop:before method=&quot;doBefore&quot; pointcut-ref=&quot;test&quot;/&gt;</span><br><span class="line">        &lt;aop:after-returning method=&quot;doAfter&quot; pointcut-ref=&quot;test&quot;/&gt;</span><br><span class="line">    &lt;/aop:aspect&gt;</span><br><span class="line">&lt;/aop:config&gt;</span><br></pre></td></tr></table></figure>
+
+</li>
+</ul>
+<p><strong>AOP 配置元素 描述</strong></p>
+<ul>
+<li>aop : advisor 定义 AOP 通知器</li>
+<li>aop : after 定义 AOP 后置通知（不管被通知方法是否执行成功）</li>
+<li>aop : after-returing 定义 AOP after-returing 通知</li>
+<li>aop : after-throwing 定义 AOP after-throwing 通知</li>
+<li>aop : around 定义 AOP 环绕通知</li>
+<li>aop : aspect 定义切面</li>
+<li>aop : aspectj-autoproxy 启动 @AspectJ 注解驱动的切面</li>
+<li>aop : before 定义 AOP 前置通知</li>
+<li>aop : config 顶层的 AOP 配置元素，大多数 aop : * 元素必须包含在 元素内</li>
+<li>aop : declare-parents 为被通知的对象引入额外接口，并透明的实现</li>
+<li>aop : pointcut 定义切点</li>
+</ul>
+<p><a href="https://blog.csdn.net/github_34889651/article/details/51321499" target="_blank" rel="noopener">https://blog.csdn.net/github_34889651/article/details/51321499</a><br><a href="https://www.javadoop.com/post/spring-aop-intro" target="_blank" rel="noopener">https://www.javadoop.com/post/spring-aop-intro</a><br><a href="https://juejin.im/entry/5b572405e51d451964625f66" target="_blank" rel="noopener">https://juejin.im/entry/5b572405e51d451964625f66</a></p>
+<p>by xuyuanfa</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>JVM虚拟机浓缩篇</title>
+    <url>/2019/10/14/JVM%E8%99%9A%E6%8B%9F%E6%9C%BA%E6%B5%93%E7%BC%A9%E7%AF%87/</url>
+    <content><![CDATA[<ul>
+<li><a href="##1">内存分配区域</a></li>
+<li><a href="##2">GC垃圾收集</a></li>
+<li><a href="##3">JMM内存模型</a><a id="more"></a>
+
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="内存分配区域"><a href="#内存分配区域" class="headerlink" title="内存分配区域"></a>内存分配区域</h3><p><strong>程序计数器</strong></p>
+<ul>
+<li>当前线程所执行的字节码的行号指示器，在虚拟机的概念模型里，字节码解释器工作时就是通过改变这个计数器的值来选择下一条需要执行的字节码指令。</li>
+<li>线程私有。</li>
+</ul>
+<p><strong>Java虚拟机栈</strong></p>
+<ul>
+<li>Java方法执行的内存模型，每个方法在执行的同时都会创建一个栈帧用于存储局部变量表、操作数栈、动态链接、方法出口等信息。</li>
+<li>局部变量表存放了编译器可知的各种基本数据类型、对象引用和returnAddress类型（指向了一条字节码指令的地址）。</li>
+<li>线程私有。</li>
+</ul>
+<p><strong>本地方法栈</strong></p>
+<ul>
+<li>虚拟机栈为虚拟机指向Java方法（也就是字节码）服务，而本地方法栈则为细腻及使用到的Native方法服务。</li>
+<li>线程私有。</li>
+</ul>
+<p><strong>Java堆</strong></p>
+<ul>
+<li>被所有线程共享的一块内存区域，在虚拟机启动时创建。</li>
+<li>存放对象实例。</li>
+<li>垃圾收集器管理的主要区域，现在收集器级别都采用分代收集算法。</li>
+<li>线程共享。</li>
+</ul>
+<p><strong>方法区</strong></p>
+<ul>
+<li>用于存储已被虚拟机加载的类信息、常量、静态变量、即时编译器编译后的代码等数据。</li>
+<li>别名“Non-Heap”（非堆），目的与Java堆区分。</li>
+<li>垃圾收集主要收集两部分内容：废弃常量和无用的类。</li>
+<li>线程共享。</li>
+</ul>
+<p>其中，程序计数器、虚拟机栈。本地方法栈3个区域随线程而生或灭。</p>
+<p><span id="#2"></span></p>
+<h3 id="GC垃圾收集"><a href="#GC垃圾收集" class="headerlink" title="GC垃圾收集"></a>GC垃圾收集</h3><p><strong>对象存活判断</strong></p>
+<ul>
+<li>引用计数算法：存在相互循环引用问题；</li>
+<li>可达性分析算法：宣告一个对象死亡，至少经历两次标记，可在finalize()中拯救自己。</li>
+</ul>
+<p><strong>垃圾收集算法</strong></p>
+<ul>
+<li>标记清除：效率不高，空间碎片；</li>
+<li>复制算法：预留一块空间；</li>
+<li>标记整理：标记回收对象，移动存活对象，清理边界外的内存；</li>
+<li>分代收集：新生代大批量死去选用复制算法，老年代存活率高选用标记清除或标记整理算法；</li>
+</ul>
+<p><strong>内存分配及回收策略</strong></p>
+<ol>
+<li>HotSpot虚拟机默认Eden区和Survivor区比例是8:1:1</li>
+<li>对象优先在Eden区中分配，不够空间时虚拟机发起一次Minor GC，把存活对象转移到另一块Survivor，GC期间Survivor无法容纳的对象直接进入老年代，通过分配担保机制提前转移到老年代去。</li>
+<li>大对象直接进入老年代，-XX:PretenureSizeThreshold参数可配置大于这个设置值的对象直接进入老年代。</li>
+<li>长期存活对象将进入老年代，对象在Survivor区中每熬过一次Minor GC，年龄加1岁，当达到一定程度（默认为15岁），就转移到老年代。-XX:MaxTenuringThreshold设置年龄阀值。</li>
+<li>如果在Survivor空间中相同年龄所有对象大小的总和大于Survivor空间的一半，年龄大于或等于该年龄的对象就可以直接进入老年代，无须等到MaxTenuringThreshold设置的值。</li>
+</ol>
+<p><strong>进入老年代的条件</strong></p>
+<ol>
+<li>Survivor无法容纳的对象直接进入老年代</li>
+<li>大对象直接进入老年代，参数配置-XX:PretenureSizeThreshold</li>
+<li>长期标记存活进入老年代，参数配置-XX:MaxTenuringThreshold设置年龄阀值</li>
+<li>相同年龄超过Survivor空间的一半，大于等于该年龄的对象提前进入老年代</li>
+</ol>
+<p><strong>触发GC</strong></p>
+<ul>
+<li>Minor GC，当Eden区没有足够的空间进行分配时，虚拟机发起一次Minor GC。</li>
+<li>Full GC，JDK6 Update24之后，只要老年代最大可用的连续空间大于新生代对象总大小或者历次晋升的平均大小就会进行Minor GC，否则将进行Full GC。</li>
+</ul>
+<p><span id="#3"></span></p>
+<h3 id="JMM内存模型"><a href="#JMM内存模型" class="headerlink" title="JMM内存模型"></a>JMM内存模型</h3><ul>
+<li>线程-本地内存-主内存，之间的关系，本地内存存储共享变量的副本，本地内存是抽象概念并不存在，它涵盖了缓存，写缓冲区，寄存器以及其他的硬件和编译器优化。</li>
+<li>JMM通过控制主内存与每个线程的本地内存之间的交互，来为java程序员提供内存可见性保证。</li>
+<li>从java源代码到最终实际执行的指令序列，会分别经历下面三种重排序：</li>
+</ul>
+<ol>
+<li>编译器优化的重排序。编译器在不改变单线程程序语义的前提下，可以重新安排语句的执行顺序。</li>
+<li>指令级并行的重排序。现代处理器采用了指令级并行技术（Instruction-Level Parallelism， ILP）来将多条指令重叠执行。如果不存在数据依赖性，处理器可以改变语句对应机器指令的执行顺序。</li>
+<li>内存系统的重排序。由于处理器使用缓存和读/写缓冲区，这使得加载和存储操作看上去可能是在乱序执行</li>
+</ol>
+<p>by xuyuanfa</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>JUC并发包浓缩篇</title>
+    <url>/2019/10/14/JUC%E5%B9%B6%E5%8F%91%E5%8C%85%E6%B5%93%E7%BC%A9%E7%AF%87/</url>
+    <content><![CDATA[<ul>
+<li><a href="##1">线程池</a></li>
+<li><a href="##2">同步辅助类Semaphore、CountDownLatch、CyclicBarrier、Phaser、Exchanger</a></li>
+<li><a href="##3">原子变量和原子类</a></li>
+<li><a href="##4">ConcurrentHashMap</a></li>
+<li><a href="##5">CopyOnWrite</a></li>
+<li><a href="##6">ForkJoin</a></li>
+<li><a href="##7">锁</a><a id="more"></a>
+
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="线程池"><a href="#线程池" class="headerlink" title="线程池"></a>线程池</h3><p><strong>线程池核心构造方法</strong></p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public ThreadPoolExecutor(</span><br><span class="line">int corePoolSize,</span><br><span class="line">int maximumPoolSize,</span><br><span class="line">long keepAliveTime,</span><br><span class="line">TimeUnit unit,</span><br><span class="line">BlockingQueue&lt;Runnable&gt; workQueue,</span><br><span class="line">ThreadFactory threadFactory,</span><br><span class="line">RejectedExecutionHandler handler)&#123;...&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>corePoolSize：当前线程池中的线程数目小于corePoolSize，则每来一个任务，就会创建线程执行这个任务；</li>
+<li>workQueue：当前线程池中的线程数目&gt;=corePoolSize，则每来一个任务，会尝试将其添加到任务缓存队列当中；</li>
+<li>maximumPoolSize：当workQueue有界队列满了，则每来一个任务，创建临时线程执行这个任务，当前线程池中的线程数目达到maximumPoolSize，则会采取任务拒绝策略进行处理；</li>
+<li>rejectedExecutionHandler：拒绝策略；</li>
+<li>keepAliveTime：临时线程休闲时的存活时间；</li>
+<li>TimeUnit：存活时间单位；</li>
+<li>threadFactory：线程工厂，可自定义有意义名称的线程，也可以使用默认线程工厂；</li>
+</ul>
+<p><strong>预设线程池</strong></p>
+<ul>
+<li>newSingleThreadExecutor：<br>创建一个单线程的线程池。这个线程池只有一个线程在工作，也就是相当于单线程串行执行所有任务。如果这个唯一的线程因为异常结束，那么会有一个新的线程来替代它。此线程池保证所有任务的执行顺序按照任务的提交顺序执行。<br>new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<runnable>())</runnable></li>
+<li>newFixedThreadPool<br>创建固定大小的线程池。每次提交一个任务就创建一个线程，直到线程达到线程池的最大大小。线程池的大小一旦达到最大值就会保持不变，如果某个线程因为执行异常而结束，那么线程池会补充一个新线程。<br>new ThreadPoolExecutor(nThreads, nThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<runnable>())</runnable></li>
+<li>newCachedThreadPool<br>创建一个可缓存的线程池。如果线程池的大小超过了处理任务所需要的线程，那么就会回收部分空闲（60秒不执行任务）的线程，当任务数增加时，此线程池又可以智能的添加新线程来处理任务。此线程池不会对线程池大小做限制，线程池大小完全依赖于操作系统（或者说JVM）能够创建的最大线程大小。<br>new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS, new SynchronousQueue<runnable>())</runnable></li>
+<li>newScheduledThreadPool<br>创建一个大小无限的线程池。此线程池支持定时以及周期性执行任务的需求。<br>new ScheduledThreadPoolExecutor(corePoolSize, Integer.MAX_VALUE, 0, TimeUnit.NANOSECONDS, new DelayedWorkQueue())</li>
+</ul>
+<p><strong>预定义拒绝策略</strong></p>
+<ul>
+<li>ThreadPoolExecutor.AbortPolicy<br>当添加任务出错时时，直接抛出异常</li>
+<li>ThreadPoolExecutor.CallerRunsPolicy<br>当添加任务出错时时，主线程执行加入的任务</li>
+<li>ThreadPoolExecutor.DiscardOldestPolicy<br>当添加任务出错时时，移除第一个任务，执行加入的任务</li>
+<li>ThreadPoolExecutor.DiscardPolicy<br>当添加任务出错时时，忽略不做处理</li>
+</ul>
+<p><strong>线程存活机制</strong></p>
+<p>临时线程会在指定keepAliveTime空闲后销毁；<br>核心线程在设置allowCoreThreadTimeOut后允许keepAliveTime空闲后销毁；<br>实现原理：</p>
+<ol>
+<li>创建工作线程，初始化第一个task任务开始执行；</li>
+<li>循环从队列拉取任务，继续执行；</li>
+<li>如是临时线程或核心线程允许超时，则调用任务队列的poll(keepAliveTime, timeUnit)方法，指定时间后取不到任务则返回空，线程跳出循环执行至完毕自动结束；</li>
+<li>如是核心线程未设置允许超时，则调用任务队列的take()方法，无任务则一直阻塞等待。</li>
+</ol>
+<p><strong>Callable和Future</strong></p>
+<ul>
+<li>单线程用法<br>Callable对象封装成FutureTask对象（FutureTask继承了Runnable），放入new Thread(callable)执行返回future对象，future.get()获取结果；</li>
+<li>线程池用法<br>threadPool.submit(callable)，submit内部封装callable对象为FutureTask对象，执行返回future对象，future.get()获取结果；<br>threadPool.submit(runnable)，submit内部封装runnable对象为FutureTask对象，执行返回future对象，future.get()只返回null；</li>
+<li>线程池多任务结果无顺序用法<br>把threadPool封装为ExecutorCompletionService对象（接口CompletionService），cs.submit(callable)执行结果无顺利存放在cs中的队列，cs.take().get()从队列弹出结果；</li>
+</ul>
+<p>区分</p>
+<ul>
+<li>Executor，是接口，只有execute方法；</li>
+<li>ExecutorService，是接口，扩展了Executor；</li>
+<li>ThreadPoolExecutor，继承AbstractExecutorService实现了ExecutorService接口；</li>
+<li>Executors，封装了ThreadPoolExecutor的实现类；</li>
+</ul>
+<p><span id="#2"></span></p>
+<h3 id="同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger"><a href="#同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger" class="headerlink" title="同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger"></a>同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger</h3><p><strong>CountDownLatch闭锁</strong><br>await()等待一组线程达到条件countDown()后，计数为0时继续执行，不可复用。</p>
+<p><strong>CyclicBarrier循环栅栏</strong><br>await()一组线程相互等待，达到计数后同时执行，可以复用。</p>
+<p><strong>Semaphore信号量</strong><br>acquire()申请占用一个信号，release()释放一个信号，超过信号量的申请则阻塞等待释放。</p>
+<p><strong>Phaser阶段</strong><br>register()注册参与者线程，arriveAndAwaitAdvance()等待其他参与者到达；<br>new Phaser(1)初始化注册者，arriveAndDeregister()注销注册者；<br>重写onAdvance(int phase, int registeredParties) 返回true时isTerminated()为true，phase是当前阶段数（从0开始），registeredParties是当前阶段已注册数；当arriveAndAwaitAdvance()线程都达到后为一个阶段，重复进入下一阶段；<br>new Phaser(phaser)传入父节点实现分层，子phaser第一次register时也向父节点doRegister(1)。</p>
+<p><strong>Exchanger交换器</strong><br>exchange(o)交换两个线程的数据。</p>
+<p><span id="#3"></span></p>
+<h3 id="原子变量和原子类"><a href="#原子变量和原子类" class="headerlink" title="原子变量和原子类"></a>原子变量和原子类</h3><p><strong>volatile两个语义</strong><br>a.保证此变量对所有线程的可见性；<br>b.禁止指令重排序优化；</p>
+<ul>
+<li>保证原子性的规则<br>a.运算结果并不依赖变量的当前值，或者能够确保只有单一的线程修改变量的值；<br>b.变量不需要与其他的状态变量共同参与不变约束；</li>
+<li>可见性指令实现<br>lock addl $0x0,(%esp)<br>addl $0x0,(%esp)把ESP寄存器的值加0；<br>lock前缀使本CPU的cache写入内存，该写入动作会引起别的CPU或内核无效化其cache；<br>通过这样的空操作，让volatile变量的修改对其他CPU立即可见。</li>
+<li>指令重排序<br>是指CPU采用了允许将多条指令不按程序规定的顺序分开发送给各相应的电路单元处理；<br>lock addl $0x0,(%esp)指令把修改同步到内存时，所有之前的操作都已经执行完成，实现内存屏障的效果。</li>
+</ul>
+<p><strong>Atomic</strong><br>类可以分成4组</p>
+<ol>
+<li>AtomicBoolean，AtomicInteger，AtomicLong，AtomicReference</li>
+<li>AtomicIntegerArray，AtomicLongArray</li>
+<li>AtomicLongFieldUpdater，AtomicIntegerFieldUpdater，AtomicReferenceFieldUpdater</li>
+<li>AtomicMarkableReference，AtomicStampedReference，AtomicReferenceArray</li>
+</ol>
+<p>AtomicInteger 类主要利用 CAS (compare and swap) + volatile 和 native 方法来保证原子操作。</p>
+<p><span id="#4"></span></p>
+<h3 id="ConcurrentHashMap"><a href="#ConcurrentHashMap" class="headerlink" title="ConcurrentHashMap"></a>ConcurrentHashMap</h3><p><strong>JDK7中ConcurrentHashMap结构</strong></p>
+<ul>
+<li><p>分段锁Segment<br>内部类似于HashMap的结构，拥有一个Entry数组，数组中的每个元素又是一个链表；<br>同时又是一个ReentrantLock（Segment继承了ReentrantLock）。</p>
+</li>
+<li><p>对比HashMap</p>
+</li>
+</ul>
+<ol>
+<li>ConcurrentHashMap中的HashEntry相对于HashMap中的Entry有一定的差异性：HashEntry中的value以及next都被volatile修饰，这样在多线程读写过程中能够保持它们的可见性。</li>
+<li>ConcurrentHashMap键值对都不能为空。</li>
+<li>HashMap键值对可为空，当key为null时，存放在数组的第0个链表。</li>
+</ol>
+<ul>
+<li>结构<br>ConcurrentHashMap–&gt;Segment数组–&gt;HashEntry数组–&gt;链表–&gt;键值对。<br>HashMap–&gt;Entry数组–&gt;链表–&gt;键值对。</li>
+</ul>
+<p><strong>ConcurrentHashMap双倍扩容</strong><br>元素存放数组位置：key的hash值与 HashEntry数组长度减一的与运算；</p>
+<ul>
+<li>双倍扩容<br>数组长度是2的倍数，元素的key的hash值再次和新长度减一做与运算，位置取决于2倍数减一的二进制的第一个1，即决定存放在原来的数组位置，还是加一倍的位置。</li>
+</ul>
+<p><strong>JDK8中ConcurrentHashMap结构</strong><br>抛弃了原有的 Segment 分段锁，而采用了 CAS + synchronized 来保证并发安全性。</p>
+<ul>
+<li>结构<br>ConcurrentHashMap–&gt;Node数组–&gt;链表（或红黑树）–&gt;键值对。</li>
+<li>原理</li>
+</ul>
+<ol>
+<li>数组索引位置的链表为空时，尝试CAS写入第一个node。</li>
+<li>数组索引位置有node时，synchronized锁住第一个node。</li>
+<li>第一个node的hash值大于0时表示链表，遍历链表，key已存在则更新，不存在则写入尾巴。</li>
+<li>数量大于等于8 时转换为红黑树。</li>
+</ol>
+<p><strong>JDK8中，HashMap特性：</strong></p>
+<ol>
+<li>添加红黑树，当链表长度大于等于8时，转换链表为红黑树；</li>
+<li>扩容优化，计算索引位置改为计算是否落在原索引，否则原索引+扩容大小，与运算2的幂次方（只有一个1），采用链表预存储元素，头部节点指向第一个元素，尾部节点向后移动，替代每次增加元素到数组的链表，思路更清晰；</li>
+<li>求数组位置，与运算取代取模运算，由于长度固定为2的幂次方，长度减1与运算；</li>
+</ol>
+<p><span id="#5"></span></p>
+<h3 id="CopyOnWrite"><a href="#CopyOnWrite" class="headerlink" title="CopyOnWrite"></a>CopyOnWrite</h3><p>可以对CopyOnWrite容器进行并发的读，而不需要加锁，用于读多写少的并发场景。<br>Copy的是引用，而不是在堆内存复制对象。</p>
+<p><span id="#6"></span></p>
+<h3 id="ForkJoin"><a href="#ForkJoin" class="headerlink" title="ForkJoin"></a>ForkJoin</h3><p>是一个执行并行任务的框架，它是把一个大任务分割成若干个小任务，再将若干个小任务的计算结果汇总起来，得到大任务的计算结果。<br>采用的是工作窃取算法，某个线程从其他队列中窃取任务进行执行的过程。<br>执行：创建ForkJoinPool，创建任务RecursiveTask，提交任务submit(task)。</p>
+<pre><code>@Override
+protected Integer compute() {
+    int sum = 0;
+    //如果任务足够小就计算任务
+    boolean canCompute = (end - start) &lt;= threshold;
+    if (canCompute) {
+        for (int i = start; i &lt;= end; i++) {
+            sum += i;
+        }
+    } else {
+        // 如果任务大于阈值，就分裂成两个子任务计算
+        int middle = (start + end) / 2;
+        ForkJoinTaskExample leftTask = new ForkJoinTaskExample(start, middle);
+        ForkJoinTaskExample rightTask = new ForkJoinTaskExample(middle + 1, end);
+        // 执行子任务
+        leftTask.fork();
+        rightTask.fork();
+        // 等待任务执行结束合并其结果
+        int leftResult = leftTask.join();
+        int rightResult = rightTask.join();
+        // 合并子任务
+        sum = leftResult + rightResult;
+    }
+    return sum;
+}</code></pre><p><span id="#7"></span></p>
+<h3 id="锁"><a href="#锁" class="headerlink" title="锁"></a>锁</h3><p><a href="#10">同步锁2019总结篇</a></p>
+<p>by xuyuanfa</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>Hello World</title>
+    <url>/2019/10/14/hello-world/</url>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/deployment.html" target="_blank" rel="noopener">Deployment</a></p>
+]]></content>
+  </entry>
+</search>

@@ -79,17 +79,17 @@
 
 
 
-<meta name="description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
+<meta name="description" content="了解AQS AQS实现基础 独占锁实现 共享锁实现 独占锁与共享锁最大的区别 获取锁的一些区别 条件协作 链表入队实现">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Hello World">
-<meta property="og:url" content="http://yoursite.com/2019/10/14/hello-world/index.html">
+<meta property="og:title" content="AQS同步器原理分析">
+<meta property="og:url" content="http://yoursite.com/2019/10/14/AQS同步器原理分析/index.html">
 <meta property="og:site_name" content="残酷月光">
-<meta property="og:description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
+<meta property="og:description" content="了解AQS AQS实现基础 独占锁实现 共享锁实现 独占锁与共享锁最大的区别 获取锁的一些区别 条件协作 链表入队实现">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-10-14T11:05:16.067Z">
+<meta property="og:updated_time" content="2019-10-15T09:14:35.983Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Hello World">
-<meta name="twitter:description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
+<meta name="twitter:title" content="AQS同步器原理分析">
+<meta name="twitter:description" content="了解AQS AQS实现基础 独占锁实现 共享锁实现 独占锁与共享锁最大的区别 获取锁的一些区别 条件协作 链表入队实现">
 
 
 
@@ -119,13 +119,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/10/14/hello-world/">
+  <link rel="canonical" href="http://yoursite.com/2019/10/14/AQS同步器原理分析/">
 
 
 
 
 
-  <title>Hello World | 残酷月光</title>
+  <title>AQS同步器原理分析 | 残酷月光</title>
   
 
 
@@ -284,7 +284,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/14/hello-world/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/14/AQS同步器原理分析/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="xuyuanfa">
@@ -301,7 +301,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">Hello World</h1>
+          <h1 class="post-title" itemprop="name headline">AQS同步器原理分析</h1>
         
 
         <div class="post-meta">
@@ -313,7 +313,7 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-14T19:05:16+08:00">
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-14T20:47:40+08:00">
                 2019-10-14
               </time>
             
@@ -332,8 +332,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/10/14/hello-world/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2019/10/14/hello-world/" itemprop="commentCount"></span>
+                <a href="/2019/10/14/AQS同步器原理分析/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2019/10/14/AQS同步器原理分析/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -361,19 +361,156 @@
       
 
       
-        <p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
+        <ul>
+<li><a href="##1">了解AQS</a></li>
+<li><a href="##2">AQS实现基础</a></li>
+<li><a href="##3">独占锁实现</a></li>
+<li><a href="##4">共享锁实现</a></li>
+<li><a href="##5">独占锁与共享锁最大的区别</a></li>
+<li><a href="##6">获取锁的一些区别</a></li>
+<li><a href="##7">条件协作</a></li>
+<li><a href="##8">链表入队实现</a><a id="more"></a>
 
-<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
 
-<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
 
-<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/deployment.html" target="_blank" rel="noopener">Deployment</a></p>
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="了解AQS"><a href="#了解AQS" class="headerlink" title="了解AQS"></a>了解AQS</h3><p>AQS 提供了两种锁，分别是独占锁和共享锁。</p>
+<ul>
+<li>独占锁，线程间互斥的独占操作，比如 ReentrantLock。</li>
+<li>共享锁，多个线程共享操作直到触发场景条件，比如 CountDownLatch 和 Semaphore 等同步工具。</li>
+</ul>
+<p><span id="#2"></span></p>
+<h3 id="AQS实现基础"><a href="#AQS实现基础" class="headerlink" title="AQS实现基础"></a>AQS实现基础</h3><p><strong>锁的同步状态state ：</strong></p>
+<ul>
+<li>由实现类操作state，利用state实现不同场景，AQS自身不操作改变state。</li>
+<li>独占锁（以ReentrantLock为例）<ul>
+<li>当state &gt; 0 为有锁状态，当前线程每次重入加锁 state加 1，即代表当前持有锁的线程加了 state 次锁，反之解锁时每次减一；有锁状态下AQS处理其他线程入队（链表）等待。</li>
+<li>当 statte = 0 为无锁状态。</li>
+</ul>
+</li>
+<li>共享锁<ul>
+<li>不同场景state的用法不一样。</li>
+</ul>
+</li>
+</ul>
+<p><strong>节点的状态waitStatus：</strong></p>
+<ul>
+<li>CANCELLED（1）：取消状态，如果当前线程的前置节点状态为 CANCELLED，则表明前置节点已经等待超时或者已经被中断了，这时需要将其从等待队列中删除。</li>
+<li>SIGNAL（-1）：等待触发状态，如果当前线程的前置节点状态为 SIGNAL，则表明当前线程需要阻塞。</li>
+<li>CONDITION（-2）：等待条件状态，表示当前节点在等待 condition，即在 condition 队列中。</li>
+<li>PROPAGATE（-3）：状态需要向后传播，表示 releaseShared 需要被传播给后续节点，仅在共享锁模式下使用。</li>
+<li>0（0）：以上都不是。</li>
+</ul>
+<p><strong>AQS 的结构大概可总结为以下 3 部分：</strong></p>
+<ul>
+<li>用 volatile 修饰的整数类型的 state 状态，用于表示同步状态，提供 getState 和 setState 来操作同步状态；</li>
+<li>提供了一个 FIFO 等待队列，实现线程间的竞争和等待，这是 AQS 的核心；</li>
+<li>AQS 内部提供了各种基于 CAS 原子操作方法，如 compareAndSetState 方法，并且提供了锁操作的acquire和release方法。</li>
+</ul>
+<p><span id="#3"></span></p>
+<h3 id="独占锁实现"><a href="#独占锁实现" class="headerlink" title="独占锁实现"></a>独占锁实现</h3><p><strong>独占锁获取锁：</strong></p>
+<ol>
+<li>尝试获取锁tryAcquire，成功则返回（ReentrantLock会操作state加1），否则添加节点到链表；</li>
+<li>尾节点为空时，new Node()空节点初始化为头尾节点，并加入当前线程节点至尾节点；</li>
+<li>尾节点不为空时，当前线程节点CAS操作加入尾节点，自旋直至成功；<br>（加入尾节点的过程需要CAS+自旋，头节点可能被抢先初始化、前置节点可能被释放）</li>
+<li>添加完节点，从队列自旋获取锁，当前线程节点的前置节点是头节点时，尝试获取锁（头节点可能刚好释放锁），失败或前置非头节点则挂起等待（线程中断或超时时取消节点，如果前置节点已被取消，则移除节点前已被取消的节点，继续自旋）；</li>
+<li>释放锁唤起线程继续第4步的自旋；</li>
+<li>锁状态state为0时获取锁成功，state加1，移除头节点；</li>
+<li>当异常跳出自旋，取消节点。</li>
+</ol>
+<p><strong>独占锁释放锁：</strong></p>
+<ol>
+<li>尝试释放锁tryRelease，实现类操作state（ReentrantLock会操作state减1）；</li>
+<li>锁状态state为0时，释放成功，处理唤醒节点线程；</li>
+<li>当头节点头节点不为空且状态waitStatus不为0时（标注1），进入唤醒；</li>
+<li>当头节点状态waitStatus小于0时则设置为0，将头节点的后继节点唤醒，如果后继节点为空或已被取消，则从尾节点向前遍历到最后一个可唤醒节点。<blockquote>
+<p>标注1：个人理解，不唤醒初始化状态头节点的后继节点，分析代码也不会冲突，但没必要。第一次锁等待时，头尾节点为同一个初始化节点，并立即自旋尝试获取锁，第一次尝试未成功也会修改waitStatus为SIGNAL，只有在前置节点状态是SIGNAL时后继节点才会挂起。因此，头节点状态是0时，后继节点还没挂起，甚至正在加入链表。</p>
+</blockquote>
+</li>
+</ol>
+<p><span id="#4"></span></p>
+<h3 id="共享锁实现"><a href="#共享锁实现" class="headerlink" title="共享锁实现"></a>共享锁实现</h3><p><strong>共享锁获取锁：</strong></p>
+<ol>
+<li>尝试获取锁tryAcquireShared，成功则返回（视场景而定），否则添加节点到链表；</li>
+<li>同独占锁获取锁的步骤2/3/4/5；</li>
+<li>不同场景不同实现，尝试获取锁满足条件时成功，移除头节点，当需要向后传播时，释放共享锁唤醒节点线程，成功则可继续唤醒节点线程（标注2）（标注3）。</li>
+<li>当异常跳出自旋，取消节点。<blockquote>
+<p>标注2：因为唤醒节点，传播并发唤醒，唤醒的节点可能抢先移除头节点；<br>标注3：例如信号量一次性释放n个，则需传播唤醒链表中的节点:</p>
+</blockquote>
+</li>
+</ol>
+<p><strong>共享锁释放锁：</strong></p>
+<ol>
+<li>尝试释放锁tryReleaseShared，成功（视场景而定）则唤醒链表中节点；</li>
+<li>唤醒头节点线程，尝试获取锁去修改锁状态state；</li>
+<li>成功则可继续唤醒节点线程（标注2）。</li>
+</ol>
+<p><strong>一些共享锁实现的原理：</strong></p>
+<ul>
+<li>读写锁：</li>
+</ul>
+<ol>
+<li>以锁状态state的高16位保存读锁状态，低16位保存写锁状态；</li>
+<li>读锁是共享锁，读读不互斥，高16位保存读锁获取数，当低16位大于0且不是当前线程时，存在写锁互斥；</li>
+</ol>
+<ul>
+<li>闭锁：</li>
+</ul>
+<ol>
+<li>以锁状态state保存闭锁count数目；</li>
+<li>每一次await创建线程节点添加至共享锁等待链表，并挂起等待；</li>
+<li>每一次countDown仅处理state减1，为0时唤醒等待线程，并传播唤醒所有等待节点；</li>
+</ol>
+<ul>
+<li>信号量：</li>
+</ul>
+<ol>
+<li>锁状态state保存可用的信号量数目；</li>
+<li>每一次acquire处理state减n，当state等于0时不处理减1，为0时才创建线程节点添加至共享锁等待链表，并挂起等待；</li>
+<li>每一次release处理state加n，唤醒等待线程，并传播唤醒所有等待节点，仅有n能成功，其他继续挂起；</li>
+</ol>
+<p><span id="#5"></span></p>
+<h3 id="独占锁与共享锁最大的区别"><a href="#独占锁与共享锁最大的区别" class="headerlink" title="独占锁与共享锁最大的区别"></a>独占锁与共享锁最大的区别</h3><ol>
+<li>独占锁是唤醒线程抢占锁排斥继续工作，头节点表示成功抢占锁的工作线程；</li>
+<li>共享锁是唤醒线程释放节点，让锁状态state能够满足场景条件而继续工作；</li>
+</ol>
+<p><span id="#6"></span></p>
+<h3 id="获取锁的一些区别"><a href="#获取锁的一些区别" class="headerlink" title="获取锁的一些区别"></a>获取锁的一些区别</h3><ul>
+<li>默认获取锁：当线程被中断，设置中断标志，不会抛出异常；</li>
+<li>可中断获取锁：当线程被中断，抛出中断异常；</li>
+<li>可超时获取锁：当线程等待超时，返回false，当线程被中断，抛出中断异常；</li>
+</ul>
+<p><span id="#7"></span></p>
+<h3 id="条件协作"><a href="#条件协作" class="headerlink" title="条件协作"></a>条件协作</h3><p>用于独占锁，挂起线程并释放锁。</p>
+<ul>
+<li>ConditionObject.await</li>
+</ul>
+<ol>
+<li>创建线程节点加入条件等待链表；</li>
+<li>一次性释放state为0（每次重入锁state加1），即释放锁；</li>
+<li>挂起线程，等待signal把线程节点加入等待链表；</li>
+<li>线程被唤醒后，执行获取独占锁，一次性把state加回去。</li>
+</ol>
+<ul>
+<li>ConditionObject.signal</li>
+</ul>
+<ol>
+<li>取出条件对象中的第一个线程节点，加入锁等待链表；</li>
+<li>如果前置节点被取消，或状态被改，唤醒当前线程继续执行await（标注4）；<blockquote>
+<p>标注4：个人理解，处理前置节点线程被中断取消的情况，提前唤醒线程执行获取独占锁，清除被取消的节点。</p>
+</blockquote>
+</li>
+</ol>
+<p><span id="#8"></span></p>
+<h3 id="链表入队实现"><a href="#链表入队实现" class="headerlink" title="链表入队实现"></a>链表入队实现</h3><ol>
+<li>创建当前线程节点；</li>
+<li>为了更快，先判断链表不为空时，直接入队（这里的快只是少了个循环指令吧，源码注释// Try the fast path of enq）；</li>
+<li>当链表为空时，初始化链表，头节点为无线程的new Node()（可理解为持有锁正在执行的线程，但不知道是谁，反正就是要排在它后面）；</li>
+<li>当链表不为空时，直接入队；</li>
+</ol>
+<p>by xuyuanfa</p>
 
       
     </div>
@@ -398,14 +535,18 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
+              <a href="/2019/10/14/Redis主从同步如何传输数据/" rel="next" title="Redis主从同步如何传输数据">
+                <i class="fa fa-chevron-left"></i> Redis主从同步如何传输数据
+              </a>
+            
           </div>
 
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2019/10/14/JUC并发包浓缩篇/" rel="prev" title="JUC并发包浓缩篇">
-                JUC并发包浓缩篇 <i class="fa fa-chevron-right"></i>
+              <a href="/2019/10/14/架构基础知识2019浓缩篇/" rel="prev" title="架构基础知识浓缩篇">
+                架构基础知识浓缩篇 <i class="fa fa-chevron-right"></i>
               </a>
             
           </div>
@@ -532,7 +673,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Quick-Start"><span class="nav-number">1.</span> <span class="nav-text">Quick Start</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Create-a-new-post"><span class="nav-number">1.1.</span> <span class="nav-text">Create a new post</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Run-server"><span class="nav-number">1.2.</span> <span class="nav-text">Run server</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Generate-static-files"><span class="nav-number">1.3.</span> <span class="nav-text">Generate static files</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Deploy-to-remote-sites"><span class="nav-number">1.4.</span> <span class="nav-text">Deploy to remote sites</span></a></li></ol></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#了解AQS"><span class="nav-number">1.</span> <span class="nav-text">了解AQS</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AQS实现基础"><span class="nav-number">2.</span> <span class="nav-text">AQS实现基础</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#独占锁实现"><span class="nav-number">3.</span> <span class="nav-text">独占锁实现</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#共享锁实现"><span class="nav-number">4.</span> <span class="nav-text">共享锁实现</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#独占锁与共享锁最大的区别"><span class="nav-number">5.</span> <span class="nav-text">独占锁与共享锁最大的区别</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#获取锁的一些区别"><span class="nav-number">6.</span> <span class="nav-text">获取锁的一些区别</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#条件协作"><span class="nav-number">7.</span> <span class="nav-text">条件协作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#链表入队实现"><span class="nav-number">8.</span> <span class="nav-text">链表入队实现</span></a></li></ol></div>
             
 
           </div>
@@ -709,9 +850,9 @@
     
       <script type="text/javascript">
         var disqus_config = function () {
-          this.page.url = 'http://yoursite.com/2019/10/14/hello-world/';
-          this.page.identifier = '2019/10/14/hello-world/';
-          this.page.title = 'Hello World';
+          this.page.url = 'http://yoursite.com/2019/10/14/AQS同步器原理分析/';
+          this.page.identifier = '2019/10/14/AQS同步器原理分析/';
+          this.page.title = 'AQS同步器原理分析';
         };
         var d = document, s = d.createElement('script');
         s.src = 'https://cloud.disqus.com/embed.js';

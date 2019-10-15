@@ -79,17 +79,17 @@
 
 
 
-<meta name="description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
+<meta name="description" content="线程池 同步辅助类Semaphore、CountDownLatch、CyclicBarrier、Phaser、Exchanger 原子变量和原子类 ConcurrentHashMap CopyOnWrite ForkJoin 锁">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Hello World">
-<meta property="og:url" content="http://yoursite.com/2019/10/14/hello-world/index.html">
+<meta property="og:title" content="JUC并发包浓缩篇">
+<meta property="og:url" content="http://yoursite.com/2019/10/14/JUC并发包浓缩篇/index.html">
 <meta property="og:site_name" content="残酷月光">
-<meta property="og:description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
+<meta property="og:description" content="线程池 同步辅助类Semaphore、CountDownLatch、CyclicBarrier、Phaser、Exchanger 原子变量和原子类 ConcurrentHashMap CopyOnWrite ForkJoin 锁">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-10-14T11:05:16.067Z">
+<meta property="og:updated_time" content="2019-10-15T09:14:25.280Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Hello World">
-<meta name="twitter:description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick">
+<meta name="twitter:title" content="JUC并发包浓缩篇">
+<meta name="twitter:description" content="线程池 同步辅助类Semaphore、CountDownLatch、CyclicBarrier、Phaser、Exchanger 原子变量和原子类 ConcurrentHashMap CopyOnWrite ForkJoin 锁">
 
 
 
@@ -119,13 +119,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/10/14/hello-world/">
+  <link rel="canonical" href="http://yoursite.com/2019/10/14/JUC并发包浓缩篇/">
 
 
 
 
 
-  <title>Hello World | 残酷月光</title>
+  <title>JUC并发包浓缩篇 | 残酷月光</title>
   
 
 
@@ -284,7 +284,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/14/hello-world/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/10/14/JUC并发包浓缩篇/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="xuyuanfa">
@@ -301,7 +301,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">Hello World</h1>
+          <h1 class="post-title" itemprop="name headline">JUC并发包浓缩篇</h1>
         
 
         <div class="post-meta">
@@ -313,7 +313,7 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-14T19:05:16+08:00">
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2019-10-14T20:12:16+08:00">
                 2019-10-14
               </time>
             
@@ -332,8 +332,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2019/10/14/hello-world/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2019/10/14/hello-world/" itemprop="commentCount"></span>
+                <a href="/2019/10/14/JUC并发包浓缩篇/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2019/10/14/JUC并发包浓缩篇/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -361,19 +361,154 @@
       
 
       
-        <p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
+        <ul>
+<li><a href="##1">线程池</a></li>
+<li><a href="##2">同步辅助类Semaphore、CountDownLatch、CyclicBarrier、Phaser、Exchanger</a></li>
+<li><a href="##3">原子变量和原子类</a></li>
+<li><a href="##4">ConcurrentHashMap</a></li>
+<li><a href="##5">CopyOnWrite</a></li>
+<li><a href="##6">ForkJoin</a></li>
+<li><a href="##7">锁</a><a id="more"></a>
 
-<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+</li>
+</ul>
+<p><span id="#1"></span></p>
+<h3 id="线程池"><a href="#线程池" class="headerlink" title="线程池"></a>线程池</h3><p><strong>线程池核心构造方法</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">public ThreadPoolExecutor(</span><br><span class="line">int corePoolSize,</span><br><span class="line">int maximumPoolSize,</span><br><span class="line">long keepAliveTime,</span><br><span class="line">TimeUnit unit,</span><br><span class="line">BlockingQueue&lt;Runnable&gt; workQueue,</span><br><span class="line">ThreadFactory threadFactory,</span><br><span class="line">RejectedExecutionHandler handler)&#123;...&#125;</span><br></pre></td></tr></table></figure>
 
-<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/deployment.html" target="_blank" rel="noopener">Deployment</a></p>
+<ul>
+<li>corePoolSize：当前线程池中的线程数目小于corePoolSize，则每来一个任务，就会创建线程执行这个任务；</li>
+<li>workQueue：当前线程池中的线程数目&gt;=corePoolSize，则每来一个任务，会尝试将其添加到任务缓存队列当中；</li>
+<li>maximumPoolSize：当workQueue有界队列满了，则每来一个任务，创建临时线程执行这个任务，当前线程池中的线程数目达到maximumPoolSize，则会采取任务拒绝策略进行处理；</li>
+<li>rejectedExecutionHandler：拒绝策略；</li>
+<li>keepAliveTime：临时线程休闲时的存活时间；</li>
+<li>TimeUnit：存活时间单位；</li>
+<li>threadFactory：线程工厂，可自定义有意义名称的线程，也可以使用默认线程工厂；</li>
+</ul>
+<p><strong>预设线程池</strong></p>
+<ul>
+<li>newSingleThreadExecutor：<br>创建一个单线程的线程池。这个线程池只有一个线程在工作，也就是相当于单线程串行执行所有任务。如果这个唯一的线程因为异常结束，那么会有一个新的线程来替代它。此线程池保证所有任务的执行顺序按照任务的提交顺序执行。<br>new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<runnable>())</runnable></li>
+<li>newFixedThreadPool<br>创建固定大小的线程池。每次提交一个任务就创建一个线程，直到线程达到线程池的最大大小。线程池的大小一旦达到最大值就会保持不变，如果某个线程因为执行异常而结束，那么线程池会补充一个新线程。<br>new ThreadPoolExecutor(nThreads, nThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<runnable>())</runnable></li>
+<li>newCachedThreadPool<br>创建一个可缓存的线程池。如果线程池的大小超过了处理任务所需要的线程，那么就会回收部分空闲（60秒不执行任务）的线程，当任务数增加时，此线程池又可以智能的添加新线程来处理任务。此线程池不会对线程池大小做限制，线程池大小完全依赖于操作系统（或者说JVM）能够创建的最大线程大小。<br>new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS, new SynchronousQueue<runnable>())</runnable></li>
+<li>newScheduledThreadPool<br>创建一个大小无限的线程池。此线程池支持定时以及周期性执行任务的需求。<br>new ScheduledThreadPoolExecutor(corePoolSize, Integer.MAX_VALUE, 0, TimeUnit.NANOSECONDS, new DelayedWorkQueue())</li>
+</ul>
+<p><strong>预定义拒绝策略</strong></p>
+<ul>
+<li>ThreadPoolExecutor.AbortPolicy<br>当添加任务出错时时，直接抛出异常</li>
+<li>ThreadPoolExecutor.CallerRunsPolicy<br>当添加任务出错时时，主线程执行加入的任务</li>
+<li>ThreadPoolExecutor.DiscardOldestPolicy<br>当添加任务出错时时，移除第一个任务，执行加入的任务</li>
+<li>ThreadPoolExecutor.DiscardPolicy<br>当添加任务出错时时，忽略不做处理</li>
+</ul>
+<p><strong>线程存活机制</strong></p>
+<p>临时线程会在指定keepAliveTime空闲后销毁；<br>核心线程在设置allowCoreThreadTimeOut后允许keepAliveTime空闲后销毁；<br>实现原理：</p>
+<ol>
+<li>创建工作线程，初始化第一个task任务开始执行；</li>
+<li>循环从队列拉取任务，继续执行；</li>
+<li>如是临时线程或核心线程允许超时，则调用任务队列的poll(keepAliveTime, timeUnit)方法，指定时间后取不到任务则返回空，线程跳出循环执行至完毕自动结束；</li>
+<li>如是核心线程未设置允许超时，则调用任务队列的take()方法，无任务则一直阻塞等待。</li>
+</ol>
+<p><strong>Callable和Future</strong></p>
+<ul>
+<li>单线程用法<br>Callable对象封装成FutureTask对象（FutureTask继承了Runnable），放入new Thread(callable)执行返回future对象，future.get()获取结果；</li>
+<li>线程池用法<br>threadPool.submit(callable)，submit内部封装callable对象为FutureTask对象，执行返回future对象，future.get()获取结果；<br>threadPool.submit(runnable)，submit内部封装runnable对象为FutureTask对象，执行返回future对象，future.get()只返回null；</li>
+<li>线程池多任务结果无顺序用法<br>把threadPool封装为ExecutorCompletionService对象（接口CompletionService），cs.submit(callable)执行结果无顺利存放在cs中的队列，cs.take().get()从队列弹出结果；</li>
+</ul>
+<p>区分</p>
+<ul>
+<li>Executor，是接口，只有execute方法；</li>
+<li>ExecutorService，是接口，扩展了Executor；</li>
+<li>ThreadPoolExecutor，继承AbstractExecutorService实现了ExecutorService接口；</li>
+<li>Executors，封装了ThreadPoolExecutor的实现类；</li>
+</ul>
+<p><span id="#2"></span></p>
+<h3 id="同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger"><a href="#同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger" class="headerlink" title="同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger"></a>同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger</h3><p><strong>CountDownLatch闭锁</strong><br>await()等待一组线程达到条件countDown()后，计数为0时继续执行，不可复用。</p>
+<p><strong>CyclicBarrier循环栅栏</strong><br>await()一组线程相互等待，达到计数后同时执行，可以复用。</p>
+<p><strong>Semaphore信号量</strong><br>acquire()申请占用一个信号，release()释放一个信号，超过信号量的申请则阻塞等待释放。</p>
+<p><strong>Phaser阶段</strong><br>register()注册参与者线程，arriveAndAwaitAdvance()等待其他参与者到达；<br>new Phaser(1)初始化注册者，arriveAndDeregister()注销注册者；<br>重写onAdvance(int phase, int registeredParties) 返回true时isTerminated()为true，phase是当前阶段数（从0开始），registeredParties是当前阶段已注册数；当arriveAndAwaitAdvance()线程都达到后为一个阶段，重复进入下一阶段；<br>new Phaser(phaser)传入父节点实现分层，子phaser第一次register时也向父节点doRegister(1)。</p>
+<p><strong>Exchanger交换器</strong><br>exchange(o)交换两个线程的数据。</p>
+<p><span id="#3"></span></p>
+<h3 id="原子变量和原子类"><a href="#原子变量和原子类" class="headerlink" title="原子变量和原子类"></a>原子变量和原子类</h3><p><strong>volatile两个语义</strong><br>a.保证此变量对所有线程的可见性；<br>b.禁止指令重排序优化；</p>
+<ul>
+<li>保证原子性的规则<br>a.运算结果并不依赖变量的当前值，或者能够确保只有单一的线程修改变量的值；<br>b.变量不需要与其他的状态变量共同参与不变约束；</li>
+<li>可见性指令实现<br>lock addl $0x0,(%esp)<br>addl $0x0,(%esp)把ESP寄存器的值加0；<br>lock前缀使本CPU的cache写入内存，该写入动作会引起别的CPU或内核无效化其cache；<br>通过这样的空操作，让volatile变量的修改对其他CPU立即可见。</li>
+<li>指令重排序<br>是指CPU采用了允许将多条指令不按程序规定的顺序分开发送给各相应的电路单元处理；<br>lock addl $0x0,(%esp)指令把修改同步到内存时，所有之前的操作都已经执行完成，实现内存屏障的效果。</li>
+</ul>
+<p><strong>Atomic</strong><br>类可以分成4组</p>
+<ol>
+<li>AtomicBoolean，AtomicInteger，AtomicLong，AtomicReference</li>
+<li>AtomicIntegerArray，AtomicLongArray</li>
+<li>AtomicLongFieldUpdater，AtomicIntegerFieldUpdater，AtomicReferenceFieldUpdater</li>
+<li>AtomicMarkableReference，AtomicStampedReference，AtomicReferenceArray</li>
+</ol>
+<p>AtomicInteger 类主要利用 CAS (compare and swap) + volatile 和 native 方法来保证原子操作。</p>
+<p><span id="#4"></span></p>
+<h3 id="ConcurrentHashMap"><a href="#ConcurrentHashMap" class="headerlink" title="ConcurrentHashMap"></a>ConcurrentHashMap</h3><p><strong>JDK7中ConcurrentHashMap结构</strong></p>
+<ul>
+<li><p>分段锁Segment<br>内部类似于HashMap的结构，拥有一个Entry数组，数组中的每个元素又是一个链表；<br>同时又是一个ReentrantLock（Segment继承了ReentrantLock）。</p>
+</li>
+<li><p>对比HashMap</p>
+</li>
+</ul>
+<ol>
+<li>ConcurrentHashMap中的HashEntry相对于HashMap中的Entry有一定的差异性：HashEntry中的value以及next都被volatile修饰，这样在多线程读写过程中能够保持它们的可见性。</li>
+<li>ConcurrentHashMap键值对都不能为空。</li>
+<li>HashMap键值对可为空，当key为null时，存放在数组的第0个链表。</li>
+</ol>
+<ul>
+<li>结构<br>ConcurrentHashMap–&gt;Segment数组–&gt;HashEntry数组–&gt;链表–&gt;键值对。<br>HashMap–&gt;Entry数组–&gt;链表–&gt;键值对。</li>
+</ul>
+<p><strong>ConcurrentHashMap双倍扩容</strong><br>元素存放数组位置：key的hash值与 HashEntry数组长度减一的与运算；</p>
+<ul>
+<li>双倍扩容<br>数组长度是2的倍数，元素的key的hash值再次和新长度减一做与运算，位置取决于2倍数减一的二进制的第一个1，即决定存放在原来的数组位置，还是加一倍的位置。</li>
+</ul>
+<p><strong>JDK8中ConcurrentHashMap结构</strong><br>抛弃了原有的 Segment 分段锁，而采用了 CAS + synchronized 来保证并发安全性。</p>
+<ul>
+<li>结构<br>ConcurrentHashMap–&gt;Node数组–&gt;链表（或红黑树）–&gt;键值对。</li>
+<li>原理</li>
+</ul>
+<ol>
+<li>数组索引位置的链表为空时，尝试CAS写入第一个node。</li>
+<li>数组索引位置有node时，synchronized锁住第一个node。</li>
+<li>第一个node的hash值大于0时表示链表，遍历链表，key已存在则更新，不存在则写入尾巴。</li>
+<li>数量大于等于8 时转换为红黑树。</li>
+</ol>
+<p><strong>JDK8中，HashMap特性：</strong></p>
+<ol>
+<li>添加红黑树，当链表长度大于等于8时，转换链表为红黑树；</li>
+<li>扩容优化，计算索引位置改为计算是否落在原索引，否则原索引+扩容大小，与运算2的幂次方（只有一个1），采用链表预存储元素，头部节点指向第一个元素，尾部节点向后移动，替代每次增加元素到数组的链表，思路更清晰；</li>
+<li>求数组位置，与运算取代取模运算，由于长度固定为2的幂次方，长度减1与运算；</li>
+</ol>
+<p><span id="#5"></span></p>
+<h3 id="CopyOnWrite"><a href="#CopyOnWrite" class="headerlink" title="CopyOnWrite"></a>CopyOnWrite</h3><p>可以对CopyOnWrite容器进行并发的读，而不需要加锁，用于读多写少的并发场景。<br>Copy的是引用，而不是在堆内存复制对象。</p>
+<p><span id="#6"></span></p>
+<h3 id="ForkJoin"><a href="#ForkJoin" class="headerlink" title="ForkJoin"></a>ForkJoin</h3><p>是一个执行并行任务的框架，它是把一个大任务分割成若干个小任务，再将若干个小任务的计算结果汇总起来，得到大任务的计算结果。<br>采用的是工作窃取算法，某个线程从其他队列中窃取任务进行执行的过程。<br>执行：创建ForkJoinPool，创建任务RecursiveTask，提交任务submit(task)。</p>
+<pre><code>@Override
+protected Integer compute() {
+    int sum = 0;
+    //如果任务足够小就计算任务
+    boolean canCompute = (end - start) &lt;= threshold;
+    if (canCompute) {
+        for (int i = start; i &lt;= end; i++) {
+            sum += i;
+        }
+    } else {
+        // 如果任务大于阈值，就分裂成两个子任务计算
+        int middle = (start + end) / 2;
+        ForkJoinTaskExample leftTask = new ForkJoinTaskExample(start, middle);
+        ForkJoinTaskExample rightTask = new ForkJoinTaskExample(middle + 1, end);
+        // 执行子任务
+        leftTask.fork();
+        rightTask.fork();
+        // 等待任务执行结束合并其结果
+        int leftResult = leftTask.join();
+        int rightResult = rightTask.join();
+        // 合并子任务
+        sum = leftResult + rightResult;
+    }
+    return sum;
+}</code></pre><p><span id="#7"></span></p>
+<h3 id="锁"><a href="#锁" class="headerlink" title="锁"></a>锁</h3><p><a href="#10">同步锁2019总结篇</a></p>
+<p>by xuyuanfa</p>
 
       
     </div>
@@ -398,14 +533,18 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
+              <a href="/2019/10/14/hello-world/" rel="next" title="Hello World">
+                <i class="fa fa-chevron-left"></i> Hello World
+              </a>
+            
           </div>
 
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2019/10/14/JUC并发包浓缩篇/" rel="prev" title="JUC并发包浓缩篇">
-                JUC并发包浓缩篇 <i class="fa fa-chevron-right"></i>
+              <a href="/2019/10/14/JVM虚拟机浓缩篇/" rel="prev" title="JVM虚拟机浓缩篇">
+                JVM虚拟机浓缩篇 <i class="fa fa-chevron-right"></i>
               </a>
             
           </div>
@@ -532,7 +671,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Quick-Start"><span class="nav-number">1.</span> <span class="nav-text">Quick Start</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Create-a-new-post"><span class="nav-number">1.1.</span> <span class="nav-text">Create a new post</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Run-server"><span class="nav-number">1.2.</span> <span class="nav-text">Run server</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Generate-static-files"><span class="nav-number">1.3.</span> <span class="nav-text">Generate static files</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Deploy-to-remote-sites"><span class="nav-number">1.4.</span> <span class="nav-text">Deploy to remote sites</span></a></li></ol></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#线程池"><span class="nav-number">1.</span> <span class="nav-text">线程池</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger"><span class="nav-number">2.</span> <span class="nav-text">同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#原子变量和原子类"><span class="nav-number">3.</span> <span class="nav-text">原子变量和原子类</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ConcurrentHashMap"><span class="nav-number">4.</span> <span class="nav-text">ConcurrentHashMap</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CopyOnWrite"><span class="nav-number">5.</span> <span class="nav-text">CopyOnWrite</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ForkJoin"><span class="nav-number">6.</span> <span class="nav-text">ForkJoin</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#锁"><span class="nav-number">7.</span> <span class="nav-text">锁</span></a></li></ol></div>
             
 
           </div>
@@ -709,9 +848,9 @@
     
       <script type="text/javascript">
         var disqus_config = function () {
-          this.page.url = 'http://yoursite.com/2019/10/14/hello-world/';
-          this.page.identifier = '2019/10/14/hello-world/';
-          this.page.title = 'Hello World';
+          this.page.url = 'http://yoursite.com/2019/10/14/JUC并发包浓缩篇/';
+          this.page.identifier = '2019/10/14/JUC并发包浓缩篇/';
+          this.page.title = 'JUC并发包浓缩篇';
         };
         var d = document, s = d.createElement('script');
         s.src = 'https://cloud.disqus.com/embed.js';
