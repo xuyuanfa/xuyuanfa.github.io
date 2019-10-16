@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT">
+  <meta name="keywords" content="Spring AOP,SPring IoC,">
 
 
 
@@ -80,6 +80,7 @@
 
 
 <meta name="description" content="IoC控制反转 AOP切面">
+<meta name="keywords" content="Spring AOP,SPring IoC">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Spring之AOP和IoC浓缩篇">
 <meta property="og:url" content="http://yoursite.com/2019/10/14/Spring之AOP和IoC浓缩篇/index.html">
@@ -87,7 +88,7 @@
 <meta property="og:description" content="IoC控制反转 AOP切面">
 <meta property="og:locale" content="zh-Hans">
 <meta property="og:image" content="https://user-images.githubusercontent.com/11657320/66559589-35129280-eb88-11e9-8d2f-a91b78519f1a.png">
-<meta property="og:updated_time" content="2019-10-15T09:14:26.830Z">
+<meta property="og:updated_time" content="2019-10-16T03:40:08.229Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Spring之AOP和IoC浓缩篇">
 <meta name="twitter:description" content="IoC控制反转 AOP切面">
@@ -326,6 +327,28 @@
           </span>
 
           
+            <span class="post-category">
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Spring/" itemprop="url" rel="index">
+                    <span itemprop="name">Spring</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
 
           
             
@@ -367,10 +390,11 @@
 <li><a href="##1">IoC控制反转</a></li>
 <li><a href="##2">AOP切面</a><a id="more"></a>
 
+
 </li>
 </ul>
 <p><span id="#1"></span></p>
-<h3 id="IoC控制反转"><a href="#IoC控制反转" class="headerlink" title="IoC控制反转"></a><strong>IoC控制反转</strong></h3><p><strong>基础</strong></p>
+<h3 id="IoC控制反转"><a href="#IoC控制反转" class="headerlink" title="IoC控制反转"></a>IoC控制反转</h3><p><strong>基础</strong></p>
 <ul>
 <li>IoC容器是依赖控制反转的一种实现。对象生成或初始化时把数据注入到对象中，或对象注入到数据域。</li>
 <li>IoC容器是用来管理对象依赖关系的，BeanDefinition是对依赖反转模式中管理的对象依赖关系的数据抽象。</li>
@@ -404,6 +428,7 @@
 <li>resolveValueIfNecessary解析引用（递归getBean）、数组、Map、List、Set等类型</li>
 <li>BeanWraper的setPropertyValues完成属性注入</li>
 </ol>
+<p><strong>三级缓存解决依赖循环</strong><br>singletonFactories ： 进入实例化阶段的单例对象工厂的cache （三级缓存）<br>earlySingletonObjects ：完成实例化但是尚未初始化的，提前暴光的单例对象的Cache （二级缓存）<br>singletonObjects：完成初始化的单例对象的cache（一级缓存）<br>获取顺序：一级 -&gt; 二级 -&gt; 三级。<br>从一级缓存获取，不存在则从二级缓存获取，不存在则从三级缓存获取工厂进行实例化。<br>从三级缓存singletonFactories 获取工厂，实例化bean，返回原始bean对象。同时，放入二级缓存，移除三级缓存中bean对应的工厂。</p>
 <p><span id="#2"></span></p>
 <h3 id="AOP切面"><a href="#AOP切面" class="headerlink" title="AOP切面"></a><strong>AOP切面</strong></h3><p><strong>基础</strong></p>
 <ul>
@@ -421,8 +446,7 @@
 <li>引入（Introduction） ：向现有的类中添加方法或属性</li>
 <li>织入（Weaving）：把切面应用到目标对象的过程；编译期改写字节码、类加载期增强目标类的字节码、运行期创建动态代理对象；SpringAOP是运行期。</li>
 </ul>
-<p><strong>AopProxy代理对象设计原理</strong></p>
-<p>ProxyFactoryBean生成AopProxy代理对象</p>
+<p><strong>AopProxy代理对象设计原理</strong><br>ProxyFactoryBean生成AopProxy代理对象</p>
 <ol>
 <li>初始化通知器链</li>
 <li>读取配置中的所有通知器，如果是singleton类型从IoC容器getBean，如果是prototype类型则重新new通知器，加入通知器链中（advice或interceptor会被包装为通知器，其中interceptor必须实现MethodInterceptor接口）</li>
@@ -448,7 +472,7 @@
 <ul>
 <li>Spring 1.2 基于接口的配置：最早的 Spring AOP 是完全基于几个接口的，想看源码的同学可以从这里起步。</li>
 <li>Spring 2.0 schema-based 配置：Spring 2.0 以后使用 XML 的方式来配置，使用命名空间 <aop></aop></li>
-<li>Spring 2.0 @AspectJ 配置：使用注解的方式来配置，虽然叫做 @AspectJ，但是这个和 AspectJ 其实没啥关系。</li>
+<li>Spring 2.0 @AspectJ 配置：使用注解的方式来配置，虽然叫做 @AspectJ，但是和 AspectJ 没关系。</li>
 </ul>
 <p><strong>创建AOP代理对象的实现类</strong></p>
 <ul>
@@ -497,6 +521,14 @@
     
 
     <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Spring-AOP/" rel="tag"># Spring AOP</a>
+          
+            <a href="/tags/SPring-IoC/" rel="tag"># SPring IoC</a>
+          
+        </div>
       
 
       
@@ -615,7 +647,25 @@
             
 
             
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
 
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">7</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
             
 
           </nav>

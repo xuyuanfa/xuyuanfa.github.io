@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT">
+  <meta name="keywords" content="Redis缓存,">
 
 
 
@@ -80,13 +80,14 @@
 
 
 <meta name="description" content="三个阶段 全量复制 部分复制 命令传播阶段的心跳机制 注意事项 小结 问题">
+<meta name="keywords" content="Redis缓存">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis主从同步如何传输数据">
 <meta property="og:url" content="http://yoursite.com/2019/10/14/Redis主从同步如何传输数据/index.html">
 <meta property="og:site_name" content="残酷月光">
 <meta property="og:description" content="三个阶段 全量复制 部分复制 命令传播阶段的心跳机制 注意事项 小结 问题">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-10-15T09:14:32.065Z">
+<meta property="og:updated_time" content="2019-10-16T08:10:57.548Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Redis主从同步如何传输数据">
 <meta name="twitter:description" content="三个阶段 全量复制 部分复制 命令传播阶段的心跳机制 注意事项 小结 问题">
@@ -324,6 +325,28 @@
           </span>
 
           
+            <span class="post-category">
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/中间件/" itemprop="url" rel="index">
+                    <span itemprop="name">中间件</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
 
           
             
@@ -370,6 +393,8 @@
 <li><a href="##6">小结</a></li>
 <li><a href="##7">问题</a><a id="more"></a>
 
+
+
 </li>
 </ul>
 <p><span id="#1"></span></p>
@@ -402,19 +427,15 @@
 </ol>
 <p>全量复制是非常重型的操作：<br>（1）主节点通过bgsave命令fork子进程进行RDB持久化，该过程是非常消耗CPU、内存(页表复制)、硬盘IO的；<br>（2）主节点通过网络将RDB文件发送给从节点，对主从节点的带宽都会带来很大的消耗<br>（3）从节点清空老数据、载入新RDB文件的过程是阻塞的，无法响应客户端的命令；如果从节点执行bgrewriteaof，也会带来额外的消耗</p>
 <p><span id="#3"></span></p>
-<h3 id="部分复制"><a href="#部分复制" class="headerlink" title="部分复制"></a>部分复制</h3><p>（1）复制偏移量<br>主节点和从节点分别维护一个复制偏移量（offset），代表的是主节点向从节点传递的字节数。</p>
-<p>（2）复制积压缓冲区</p>
+<h3 id="部分复制"><a href="#部分复制" class="headerlink" title="部分复制"></a>部分复制</h3><p>（1）复制偏移量<br>主节点和从节点分别维护一个复制偏移量（offset），代表的是主节点向从节点传递的字节数。<br>（2）复制积压缓冲区</p>
 <ul>
 <li>复制积压缓冲区是由主节点维护的、固定长度的、先进先出FIFO队列，默认大小1MB；当主节点开始有从节点时创建，其作用是备份主节点最近发送给从节点的数据。注意，无论主节点有一个还是多个从节点，都只需要一个复制积压缓冲区。</li>
-<li>在命令传播阶段，主节点除了将写命令发送给从节点，还会发送一份给复制积压缓冲区，作为写命令的备份；除了存储写命令，复制积压缓冲区中还存储了其中的每个字节对应的复制偏移量（offset）。由于复制积压缓冲区定长且是先进先出，所以它保存的是主节点最近执行的写命令；时间较早的写命令会被挤出缓冲区。（用于网络中断时继续部分复制）</li>
+<li>在命令传播阶段，主节点除了将写命令发送给从节点，还会发送一份给复制积压缓冲区，作为写命令的备份；除了存储写命令，复制积压缓冲区中还存储了其中的每个字节对应的复制偏移量（offset）。由于复制积压缓冲区定长且是先进先出，所以它保存的是主节点最近执行的写命令；时间较早的写命令会被挤出缓冲区。（用于网络中断或丢包时继续部分复制）</li>
 <li>从节点将offset发送给主节点后，主节点根据offset和缓冲区大小决定能否执行部分复制：<ul>
 <li>a.如果offset偏移量之后的数据，仍然都在复制积压缓冲区里，则执行部分复制；</li>
-<li>b.如果offset偏移量之后的数据已不在复制积压缓冲区中（数据已被挤出），则执行全量复制。</li>
+<li>b.如果offset偏移量之后的数据已不在复制积压缓冲区中（数据已被挤出），则执行全量复制。<br>（3）服务器运行ID(runid)</li>
 </ul>
 </li>
-</ul>
-<p>（3）服务器运行ID(runid)</p>
-<ul>
 <li>每个Redis节点(无论主从)，在启动时都会自动生成一个随机ID(每次启动都不一样)，由40个随机的十六进制字符组成；runid用来唯一识别一个Redis节点。通过info Server命令，可以查看节点的runid.</li>
 <li>主从节点初次复制时，主节点将自己的runid发送给从节点，从节点将这个runid保存起来；当断线重连时，从节点会将这个runid发送给主节点；主节点根据runid判断能否进行部分复制.</li>
 </ul>
@@ -445,12 +466,10 @@
 <li>offset用于判断主从节点的数据库状态是否一致。</li>
 <li>断线连接后，从节点发送命令psync <runid> <offset>，主节点根据offset和缓冲区大小决定能否执行部分复制：<ul>
 <li>如果offset偏移量之后的数据，仍然都在复制积压缓冲区里，则执行部分复制；</li>
-<li>如果offset偏移量之后的数据已不在复制积压缓冲区中（数据已被挤出），则执行全量复制。<ul>
-<li>在命令传播阶段，从节点会向主节点发送REPLCONF ACK命令，频率是每秒1次；命令格式为：REPLCONF ACK {offset}，其中offset指从节点保存的复制偏移量。其作用：<br>（1）实时监测主从节点网络状态<br>（2）检测命令丢失：从节点发送了自身的offset，主节点会与自己的offset对比，如果从节点数据缺失（如网络丢包），主节点会推送缺失的数据（这里也会利用复制积压缓冲区）。注意，offset和复制积压缓冲区，不仅可以用于部分复制，也可以用于处理命令丢失等情形；区别在于前者是在断线重连后进行的，而后者是在主从节点没有断线的情况下进行的。<br>（3）辅助保证从节点的数量和延迟</li>
-</ul>
-</li>
+<li>如果offset偏移量之后的数据已不在复制积压缓冲区中（数据已被挤出），则执行全量复制。</li>
 </ul>
 </offset></runid></li>
+<li>在命令传播阶段，从节点会向主节点发送REPLCONF ACK命令，频率是每秒1次；命令格式为：REPLCONF ACK {offset}，其中offset指从节点保存的复制偏移量。其作用：<br>  （1）实时监测主从节点网络状态<br>  （2）检测命令丢失：从节点发送了自身的offset，主节点会与自己的offset对比，如果从节点数据缺失（如网络丢包），主节点会推送缺失的数据（这里也会利用复制积压缓冲区）。注意，offset和复制积压缓冲区，不仅可以用于部分复制，也可以用于处理命令丢失等情形；区别在于前者是在断线重连后进行的，而后者是在主从节点没有断线的情况下进行的。<br>  （3）辅助保证从节点的数量和延迟</li>
 </ul>
 <p>by xuyuanfa</p>
 
@@ -467,6 +486,12 @@
     
 
     <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis缓存/" rel="tag"># Redis缓存</a>
+          
+        </div>
       
 
       
@@ -585,7 +610,25 @@
             
 
             
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
 
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">7</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
             
 
           </nav>

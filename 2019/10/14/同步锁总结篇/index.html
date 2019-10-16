@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT">
+  <meta name="keywords" content="JUC,同步锁,">
 
 
 
@@ -80,13 +80,14 @@
 
 
 <meta name="description" content="自旋锁 synchronized内置锁 volatile原子变量 ReentrantLock ReentrantReadWriteLock AbstractQueuedSynchronizer JUC同步辅助类 LockSupport">
+<meta name="keywords" content="JUC,同步锁">
 <meta property="og:type" content="article">
 <meta property="og:title" content="同步锁总结篇">
 <meta property="og:url" content="http://yoursite.com/2019/10/14/同步锁总结篇/index.html">
 <meta property="og:site_name" content="残酷月光">
 <meta property="og:description" content="自旋锁 synchronized内置锁 volatile原子变量 ReentrantLock ReentrantReadWriteLock AbstractQueuedSynchronizer JUC同步辅助类 LockSupport">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-10-15T09:14:45.357Z">
+<meta property="og:updated_time" content="2019-10-16T08:48:24.746Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="同步锁总结篇">
 <meta name="twitter:description" content="自旋锁 synchronized内置锁 volatile原子变量 ReentrantLock ReentrantReadWriteLock AbstractQueuedSynchronizer JUC同步辅助类 LockSupport">
@@ -324,6 +325,28 @@
           </span>
 
           
+            <span class="post-category">
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java/" itemprop="url" rel="index">
+                    <span itemprop="name">Java</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
 
           
             
@@ -406,7 +429,9 @@
 <ul>
 <li>CLHlock是不停的查询前驱变量， 导致不适合在NUMA 架构下使用（在这种结构下，每个线程分布在不同的物理内存区域）</li>
 </ul>
-<p><strong>NUMA架构简介</strong><br>由于所有CPU Core都是通过共享一个北桥来读取内存，随着核数不断的发展，北桥在响应时间上的性能瓶颈越来越明显。于是，聪明的硬件设计师们，先到了把内存控制器（原本北桥中读取内存的部分）也做个拆分，平分到了每个die上。于是NUMA就出现了！<br><a href="http://cenalulu.github.io/linux/numa/" target="_blank" rel="noopener">http://cenalulu.github.io/linux/numa/</a></p>
+<blockquote>
+<p>NUMA架构简介<br>由于所有CPU Core都是通过共享一个北桥来读取内存，随着核数不断的发展，北桥在响应时间上的性能瓶颈越来越明显。于是，聪明的硬件设计师们，先到了把内存控制器（原本北桥中读取内存的部分）也做个拆分，平分到了每个die上。于是NUMA就出现了！<br><a href="http://cenalulu.github.io/linux/numa/" target="_blank" rel="noopener">http://cenalulu.github.io/linux/numa/</a></p>
+</blockquote>
 <p><span id="#2"></span></p>
 <h3 id="synchronized内置锁"><a href="#synchronized内置锁" class="headerlink" title="synchronized内置锁"></a>synchronized内置锁</h3><ol>
 <li>作为修饰符加在方法声明上, synchronized修饰非静态方法时表示锁住了调用该方法的堆对象（相对于synchronized(this)）, 修饰静态方法时表示锁住了这个类在方法区中的类对象（相对于synchronized(X.class)）；</li>
@@ -466,7 +491,7 @@
 
 <ul>
 <li>该方法是写锁调用的获取独占锁方法。</li>
-<li>锁状态不为0，写锁为0（此时存在读锁）或者独占锁持有线程不是当前线程，即会发生读写互斥返回false，或者写入锁的数量（重入数）大于65535就抛出一个Error异常。</li>
+<li>锁状态不为0，写锁为0时（此时存在读锁）或者独占锁持有线程不是当前线程，即会发生读写互斥返回false，或者写入锁的数量（重入数）大于65535就抛出一个Error异常。</li>
 <li>锁状态为0，可能是锁刚好被释放而为0，如果读写锁是公平锁时，需要判断链表中是否有正在排队的线程节点，有则需要排队返回false；如果被其他线程抢先获取写锁则CAS失败返回false。</li>
 <li>设置独占线程（写线程）为当前线程，返回true。</li>
 </ul>
@@ -478,7 +503,7 @@
 <li>条件变量：写入锁提供了条件变量(Condition)的支持，这个和独占锁一致，但是读取锁却不允许获取条件变量，将得到一个UnsupportedOperationException异常。</li>
 </ul>
 <p><span id="#6"></span></p>
-<h3 id="AbstractQueuedSynchronizer"><a href="#AbstractQueuedSynchronizer" class="headerlink" title="AbstractQueuedSynchronizer"></a>AbstractQueuedSynchronizer</h3><p><a href="#7">AQS同步器原理分析</a></p>
+<h3 id="AbstractQueuedSynchronizer"><a href="#AbstractQueuedSynchronizer" class="headerlink" title="AbstractQueuedSynchronizer"></a>AbstractQueuedSynchronizer</h3><p><a href="/2019/10/14/AQS同步器原理分析/">AQS同步器原理分析</a></p>
 <p><span id="#7"></span></p>
 <h3 id="JUC同步辅助类"><a href="#JUC同步辅助类" class="headerlink" title="JUC同步辅助类"></a>JUC同步辅助类</h3><ol>
 <li>Semaphore 信号量通常用来限制线程可以同时访问的（物理或逻辑）资源数量。</li>
@@ -489,15 +514,12 @@
 </ol>
 <p><span id="#8"></span></p>
 <h3 id="LockSupport"><a href="#LockSupport" class="headerlink" title="LockSupport"></a>LockSupport</h3><ul>
-<li><p>LockSupport是用来创建锁和其他同步类的基本线程阻塞原语。</p>
-</li>
-<li><p>LockSupport中的park() 和 unpark() 的作用分别是阻塞线程和解除阻塞线程。</p>
-<blockquote>
+<li>LockSupport是用来创建锁和其他同步类的基本线程阻塞原语。</li>
+<li>LockSupport中的park() 和 unpark() 的作用分别是阻塞线程和解除阻塞线程。<blockquote>
 <p>阻塞与解除阻塞<br>JSR166以前还没有好的阻塞和解除阻塞线程的API可以使用！只有Thread.suspend 和 Thread.resume，但这两个方法已经被废弃了，原因是有可能导致死锁。如果一个线程拥有监视器然后调用Thread.suspend使自已阻塞，另一个线程试图调用Thread.resume去唤醒它，那么这个线程去获取监视器时即出现死锁。直到后来出现的LockSupport解决了这个问题。<br>LockSupport.park可以阻塞一个线程，LockSupport.unpark可以解除阻塞，调用一次park，然后调用多次unpark只会唤醒一个线程，阻塞针对线程而不是针对同步器。特别的，如果一个线程在一个新的同步器上调用park方法有可能立即返回，因为可能有剩余的unpack存在。虽然调用多次unpark是想彻底清除阻塞状态，但这显得很笨拙，而且不划算，更有效的做法是在多次park的时候才多次unpark.</p>
 </blockquote>
 </li>
-<li><p>LockSupport 与Thread.suspend()和Thread.resume()的区别<br>在LockSupport出现之前，如果要block/unblock某个Thread，除了使用Java语言内置的monitor机制之外，只能通过Thread.suspend()和Thread.resume()。目前这两个方法都被标注为废弃。</p>
-</li>
+<li>LockSupport 与Thread.suspend()和Thread.resume()的区别<br>在LockSupport出现之前，如果要block/unblock某个Thread，除了使用Java语言内置的monitor机制之外，只能通过Thread.suspend()和Thread.resume()。目前这两个方法都被标注为废弃。</li>
 </ul>
 <p><a href="http://coderbee.net/index.php/concurrent/20131115/577" target="_blank" rel="noopener">http://coderbee.net/index.php/concurrent/20131115/577</a><br><a href="http://zhwbqd.github.io/2015/02/13/lock-in-java.html" target="_blank" rel="noopener">http://zhwbqd.github.io/2015/02/13/lock-in-java.html</a><br><a href="http://alexander-mahone.iteye.com/blog/1841134" target="_blank" rel="noopener">http://alexander-mahone.iteye.com/blog/1841134</a></p>
 <p>by xuyuanfa</p>
@@ -515,6 +537,14 @@
     
 
     <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/JUC/" rel="tag"># JUC</a>
+          
+            <a href="/tags/同步锁/" rel="tag"># 同步锁</a>
+          
+        </div>
       
 
       
@@ -629,7 +659,25 @@
             
 
             
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
 
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">7</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
             
 
           </nav>

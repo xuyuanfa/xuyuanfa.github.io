@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT">
+  <meta name="keywords" content="JUC,">
 
 
 
@@ -80,13 +80,14 @@
 
 
 <meta name="description" content="线程池 同步辅助类Semaphore、CountDownLatch、CyclicBarrier、Phaser、Exchanger 原子变量和原子类 ConcurrentHashMap CopyOnWrite ForkJoin 锁">
+<meta name="keywords" content="JUC">
 <meta property="og:type" content="article">
 <meta property="og:title" content="JUC并发包浓缩篇">
 <meta property="og:url" content="http://yoursite.com/2019/10/14/JUC并发包浓缩篇/index.html">
 <meta property="og:site_name" content="残酷月光">
 <meta property="og:description" content="线程池 同步辅助类Semaphore、CountDownLatch、CyclicBarrier、Phaser、Exchanger 原子变量和原子类 ConcurrentHashMap CopyOnWrite ForkJoin 锁">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2019-10-15T09:14:25.280Z">
+<meta property="og:updated_time" content="2019-10-16T02:00:35.253Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="JUC并发包浓缩篇">
 <meta name="twitter:description" content="线程池 同步辅助类Semaphore、CountDownLatch、CyclicBarrier、Phaser、Exchanger 原子变量和原子类 ConcurrentHashMap CopyOnWrite ForkJoin 锁">
@@ -324,6 +325,28 @@
           </span>
 
           
+            <span class="post-category">
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java/" itemprop="url" rel="index">
+                    <span itemprop="name">Java</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
 
           
             
@@ -370,6 +393,8 @@
 <li><a href="##6">ForkJoin</a></li>
 <li><a href="##7">锁</a><a id="more"></a>
 
+
+
 </li>
 </ul>
 <p><span id="#1"></span></p>
@@ -382,7 +407,7 @@
 <li>maximumPoolSize：当workQueue有界队列满了，则每来一个任务，创建临时线程执行这个任务，当前线程池中的线程数目达到maximumPoolSize，则会采取任务拒绝策略进行处理；</li>
 <li>rejectedExecutionHandler：拒绝策略；</li>
 <li>keepAliveTime：临时线程休闲时的存活时间；</li>
-<li>TimeUnit：存活时间单位；</li>
+<li>timeUnit：存活时间单位；</li>
 <li>threadFactory：线程工厂，可自定义有意义名称的线程，也可以使用默认线程工厂；</li>
 </ul>
 <p><strong>预设线程池</strong></p>
@@ -390,19 +415,18 @@
 <li>newSingleThreadExecutor：<br>创建一个单线程的线程池。这个线程池只有一个线程在工作，也就是相当于单线程串行执行所有任务。如果这个唯一的线程因为异常结束，那么会有一个新的线程来替代它。此线程池保证所有任务的执行顺序按照任务的提交顺序执行。<br>new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<runnable>())</runnable></li>
 <li>newFixedThreadPool<br>创建固定大小的线程池。每次提交一个任务就创建一个线程，直到线程达到线程池的最大大小。线程池的大小一旦达到最大值就会保持不变，如果某个线程因为执行异常而结束，那么线程池会补充一个新线程。<br>new ThreadPoolExecutor(nThreads, nThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<runnable>())</runnable></li>
 <li>newCachedThreadPool<br>创建一个可缓存的线程池。如果线程池的大小超过了处理任务所需要的线程，那么就会回收部分空闲（60秒不执行任务）的线程，当任务数增加时，此线程池又可以智能的添加新线程来处理任务。此线程池不会对线程池大小做限制，线程池大小完全依赖于操作系统（或者说JVM）能够创建的最大线程大小。<br>new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS, new SynchronousQueue<runnable>())</runnable></li>
-<li>newScheduledThreadPool<br>创建一个大小无限的线程池。此线程池支持定时以及周期性执行任务的需求。<br>new ScheduledThreadPoolExecutor(corePoolSize, Integer.MAX_VALUE, 0, TimeUnit.NANOSECONDS, new DelayedWorkQueue())</li>
+<li>newScheduledThreadPool<br>创建一个最大线程数为最大整数的线程池。此线程池支持定时以及周期性执行任务的需求。<br>new ScheduledThreadPoolExecutor(corePoolSize, Integer.MAX_VALUE, 0, TimeUnit.NANOSECONDS, new DelayedWorkQueue())</li>
 </ul>
 <p><strong>预定义拒绝策略</strong></p>
 <ul>
-<li>ThreadPoolExecutor.AbortPolicy<br>当添加任务出错时时，直接抛出异常</li>
-<li>ThreadPoolExecutor.CallerRunsPolicy<br>当添加任务出错时时，主线程执行加入的任务</li>
-<li>ThreadPoolExecutor.DiscardOldestPolicy<br>当添加任务出错时时，移除第一个任务，执行加入的任务</li>
-<li>ThreadPoolExecutor.DiscardPolicy<br>当添加任务出错时时，忽略不做处理</li>
+<li>ThreadPoolExecutor.AbortPolicy<br>当添加任务失败时，直接抛出异常</li>
+<li>ThreadPoolExecutor.CallerRunsPolicy<br>当添加任务失败时，主线程执行加入的任务</li>
+<li>ThreadPoolExecutor.DiscardOldestPolicy<br>当添加任务失败时，移除第一个任务，执行加入的任务</li>
+<li>ThreadPoolExecutor.DiscardPolicy<br>当添加任务失败时，忽略不做处理</li>
 </ul>
-<p><strong>线程存活机制</strong></p>
-<p>临时线程会在指定keepAliveTime空闲后销毁；<br>核心线程在设置allowCoreThreadTimeOut后允许keepAliveTime空闲后销毁；<br>实现原理：</p>
+<p><strong>线程存活机制</strong><br>临时线程会在指定keepAliveTime空闲后销毁；<br>核心线程在设置allowCoreThreadTimeOut后允许keepAliveTime空闲后销毁；<br>实现原理：</p>
 <ol>
-<li>创建工作线程，初始化第一个task任务开始执行；</li>
+<li>创建工作线程，初始化并执行入参的第一个task任务；</li>
 <li>循环从队列拉取任务，继续执行；</li>
 <li>如是临时线程或核心线程允许超时，则调用任务队列的poll(keepAliveTime, timeUnit)方法，指定时间后取不到任务则返回空，线程跳出循环执行至完毕自动结束；</li>
 <li>如是核心线程未设置允许超时，则调用任务队列的take()方法，无任务则一直阻塞等待。</li>
@@ -413,7 +437,7 @@
 <li>线程池用法<br>threadPool.submit(callable)，submit内部封装callable对象为FutureTask对象，执行返回future对象，future.get()获取结果；<br>threadPool.submit(runnable)，submit内部封装runnable对象为FutureTask对象，执行返回future对象，future.get()只返回null；</li>
 <li>线程池多任务结果无顺序用法<br>把threadPool封装为ExecutorCompletionService对象（接口CompletionService），cs.submit(callable)执行结果无顺利存放在cs中的队列，cs.take().get()从队列弹出结果；</li>
 </ul>
-<p>区分</p>
+<p><strong>区分</strong></p>
 <ul>
 <li>Executor，是接口，只有execute方法；</li>
 <li>ExecutorService，是接口，扩展了Executor；</li>
@@ -424,11 +448,12 @@
 <h3 id="同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger"><a href="#同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger" class="headerlink" title="同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger"></a>同步辅助类CountDownLatch、CyclicBarrier、Semaphore、Phaser、Exchanger</h3><p><strong>CountDownLatch闭锁</strong><br>await()等待一组线程达到条件countDown()后，计数为0时继续执行，不可复用。</p>
 <p><strong>CyclicBarrier循环栅栏</strong><br>await()一组线程相互等待，达到计数后同时执行，可以复用。</p>
 <p><strong>Semaphore信号量</strong><br>acquire()申请占用一个信号，release()释放一个信号，超过信号量的申请则阻塞等待释放。</p>
-<p><strong>Phaser阶段</strong><br>register()注册参与者线程，arriveAndAwaitAdvance()等待其他参与者到达；<br>new Phaser(1)初始化注册者，arriveAndDeregister()注销注册者；<br>重写onAdvance(int phase, int registeredParties) 返回true时isTerminated()为true，phase是当前阶段数（从0开始），registeredParties是当前阶段已注册数；当arriveAndAwaitAdvance()线程都达到后为一个阶段，重复进入下一阶段；<br>new Phaser(phaser)传入父节点实现分层，子phaser第一次register时也向父节点doRegister(1)。</p>
+<p><strong>Phaser阶段</strong><br>多个任务可分阶段并等待每阶段执行结果，再继续执行下一阶段的任务。<br>register()注册参与者线程，arriveAndAwaitAdvance()等待其他参与者到达；<br>new Phaser(1)初始化注册者，arriveAndDeregister()注销注册者；<br>重写onAdvance(int phase, int registeredParties) 返回true时isTerminated()为true，phase是当前阶段数（从0开始），registeredParties是当前阶段已注册数；当arriveAndAwaitAdvance()线程都达到后为一个阶段，重复进入下一阶段；<br>new Phaser(phaser)传入父节点实现分层，子phaser第一次register时也向父节点doRegister(1)。</p>
 <p><strong>Exchanger交换器</strong><br>exchange(o)交换两个线程的数据。</p>
 <p><span id="#3"></span></p>
-<h3 id="原子变量和原子类"><a href="#原子变量和原子类" class="headerlink" title="原子变量和原子类"></a>原子变量和原子类</h3><p><strong>volatile两个语义</strong><br>a.保证此变量对所有线程的可见性；<br>b.禁止指令重排序优化；</p>
+<h3 id="原子变量和原子类"><a href="#原子变量和原子类" class="headerlink" title="原子变量和原子类"></a>原子变量和原子类</h3><p><strong>volatile</strong></p>
 <ul>
+<li>两个语义<br>a.保证此变量对所有线程的可见性；<br>b.禁止指令重排序优化；</li>
 <li>保证原子性的规则<br>a.运算结果并不依赖变量的当前值，或者能够确保只有单一的线程修改变量的值；<br>b.变量不需要与其他的状态变量共同参与不变约束；</li>
 <li>可见性指令实现<br>lock addl $0x0,(%esp)<br>addl $0x0,(%esp)把ESP寄存器的值加0；<br>lock前缀使本CPU的cache写入内存，该写入动作会引起别的CPU或内核无效化其cache；<br>通过这样的空操作，让volatile变量的修改对其他CPU立即可见。</li>
 <li>指令重排序<br>是指CPU采用了允许将多条指令不按程序规定的顺序分开发送给各相应的电路单元处理；<br>lock addl $0x0,(%esp)指令把修改同步到内存时，所有之前的操作都已经执行完成，实现内存屏障的效果。</li>
@@ -446,35 +471,33 @@
 <ul>
 <li><p>分段锁Segment<br>内部类似于HashMap的结构，拥有一个Entry数组，数组中的每个元素又是一个链表；<br>同时又是一个ReentrantLock（Segment继承了ReentrantLock）。</p>
 </li>
-<li><p>对比HashMap</p>
+<li><p>对比HashMap<br>  1.ConcurrentHashMap中的HashEntry相对于HashMap中的Entry有一定的差异性：HashEntry中的value以及next都被volatile修饰，这样在多线程读写过程中能够保持它们的可见性。<br>  2.ConcurrentHashMap键值对都不能为空。<br>  3.HashMap键值对可为空，当key为null时，存放在数组的第0个链表。</p>
 </li>
-</ul>
-<ol>
-<li>ConcurrentHashMap中的HashEntry相对于HashMap中的Entry有一定的差异性：HashEntry中的value以及next都被volatile修饰，这样在多线程读写过程中能够保持它们的可见性。</li>
-<li>ConcurrentHashMap键值对都不能为空。</li>
-<li>HashMap键值对可为空，当key为null时，存放在数组的第0个链表。</li>
-</ol>
-<ul>
-<li>结构<br>ConcurrentHashMap–&gt;Segment数组–&gt;HashEntry数组–&gt;链表–&gt;键值对。<br>HashMap–&gt;Entry数组–&gt;链表–&gt;键值对。</li>
-</ul>
-<p><strong>ConcurrentHashMap双倍扩容</strong><br>元素存放数组位置：key的hash值与 HashEntry数组长度减一的与运算；</p>
-<ul>
-<li>双倍扩容<br>数组长度是2的倍数，元素的key的hash值再次和新长度减一做与运算，位置取决于2倍数减一的二进制的第一个1，即决定存放在原来的数组位置，还是加一倍的位置。</li>
+<li><p>结构<br>ConcurrentHashMap–&gt;Segment数组–&gt;HashEntry数组–&gt;链表–&gt;键值对。<br>HashMap–&gt;Entry数组–&gt;链表–&gt;键值对。</p>
+</li>
+<li><p>key哈希定位<br>对key进行哈希得到hash值，位运算定位segment的索引；<br>基于上述hash值，与HashEntry数组长度减一按位与运算得到数组索引；</p>
+</li>
+<li><p>双倍扩容<br>元素存放数组位置：key的hash值与 HashEntry数组长度减一的与运算。<br>数组长度是2的倍数，元素的key的hash值再次和新长度减一做与运算，位置取决于2倍数减一的二进制的第一个1，即决定存放在原来的数组位置，还是加一倍的位置。</p>
+</li>
 </ul>
 <p><strong>JDK8中ConcurrentHashMap结构</strong><br>抛弃了原有的 Segment 分段锁，而采用了 CAS + synchronized 来保证并发安全性。</p>
 <ul>
-<li>结构<br>ConcurrentHashMap–&gt;Node数组–&gt;链表（或红黑树）–&gt;键值对。</li>
-<li>原理</li>
-</ul>
+<li><p>结构<br>ConcurrentHashMap–&gt;Node数组–&gt;链表（或红黑树）–&gt;键值对。</p>
+</li>
+<li><p>原理</p>
 <ol>
 <li>数组索引位置的链表为空时，尝试CAS写入第一个node。</li>
 <li>数组索引位置有node时，synchronized锁住第一个node。</li>
-<li>第一个node的hash值大于0时表示链表，遍历链表，key已存在则更新，不存在则写入尾巴。</li>
+<li>第一个node的hash值大于等于0时表示链表，遍历链表，key已存在则更新，不存在则写入尾巴。</li>
 <li>数量大于等于8 时转换为红黑树。</li>
 </ol>
+</li>
+<li><p>key哈希定位<br>对key进行哈希得到hash值，与Node数组长度减一按位与运算得到数组索引；</p>
+</li>
+</ul>
 <p><strong>JDK8中，HashMap特性：</strong></p>
 <ol>
-<li>添加红黑树，当链表长度大于等于8时，转换链表为红黑树；</li>
+<li>添加红黑树，当链表长度大于等于8时（代码中减1是从0开始计算），转换链表为红黑树；</li>
 <li>扩容优化，计算索引位置改为计算是否落在原索引，否则原索引+扩容大小，与运算2的幂次方（只有一个1），采用链表预存储元素，头部节点指向第一个元素，尾部节点向后移动，替代每次增加元素到数组的链表，思路更清晰；</li>
 <li>求数组位置，与运算取代取模运算，由于长度固定为2的幂次方，长度减1与运算；</li>
 </ol>
@@ -482,32 +505,10 @@
 <h3 id="CopyOnWrite"><a href="#CopyOnWrite" class="headerlink" title="CopyOnWrite"></a>CopyOnWrite</h3><p>可以对CopyOnWrite容器进行并发的读，而不需要加锁，用于读多写少的并发场景。<br>Copy的是引用，而不是在堆内存复制对象。</p>
 <p><span id="#6"></span></p>
 <h3 id="ForkJoin"><a href="#ForkJoin" class="headerlink" title="ForkJoin"></a>ForkJoin</h3><p>是一个执行并行任务的框架，它是把一个大任务分割成若干个小任务，再将若干个小任务的计算结果汇总起来，得到大任务的计算结果。<br>采用的是工作窃取算法，某个线程从其他队列中窃取任务进行执行的过程。<br>执行：创建ForkJoinPool，创建任务RecursiveTask，提交任务submit(task)。</p>
-<pre><code>@Override
-protected Integer compute() {
-    int sum = 0;
-    //如果任务足够小就计算任务
-    boolean canCompute = (end - start) &lt;= threshold;
-    if (canCompute) {
-        for (int i = start; i &lt;= end; i++) {
-            sum += i;
-        }
-    } else {
-        // 如果任务大于阈值，就分裂成两个子任务计算
-        int middle = (start + end) / 2;
-        ForkJoinTaskExample leftTask = new ForkJoinTaskExample(start, middle);
-        ForkJoinTaskExample rightTask = new ForkJoinTaskExample(middle + 1, end);
-        // 执行子任务
-        leftTask.fork();
-        rightTask.fork();
-        // 等待任务执行结束合并其结果
-        int leftResult = leftTask.join();
-        int rightResult = rightTask.join();
-        // 合并子任务
-        sum = leftResult + rightResult;
-    }
-    return sum;
-}</code></pre><p><span id="#7"></span></p>
-<h3 id="锁"><a href="#锁" class="headerlink" title="锁"></a>锁</h3><p><a href="#10">同步锁2019总结篇</a></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">@Override</span><br><span class="line">protected Integer compute() &#123;</span><br><span class="line">    int sum = 0;</span><br><span class="line">    //如果任务足够小就计算任务</span><br><span class="line">    boolean canCompute = (end - start) &lt;= threshold;</span><br><span class="line">    if (canCompute) &#123;</span><br><span class="line">        for (int i = start; i &lt;= end; i++) &#123;</span><br><span class="line">            sum += i;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        // 如果任务大于阈值，就分裂成两个子任务计算</span><br><span class="line">        int middle = (start + end) / 2;</span><br><span class="line">        ForkJoinTaskExample leftTask = new ForkJoinTaskExample(start, middle);</span><br><span class="line">        ForkJoinTaskExample rightTask = new ForkJoinTaskExample(middle + 1, end);</span><br><span class="line">        // 执行子任务</span><br><span class="line">        leftTask.fork();</span><br><span class="line">        rightTask.fork();</span><br><span class="line">        // 等待任务执行结束合并其结果</span><br><span class="line">        int leftResult = leftTask.join();</span><br><span class="line">        int rightResult = rightTask.join();</span><br><span class="line">        // 合并子任务</span><br><span class="line">        sum = leftResult + rightResult;</span><br><span class="line">    &#125;</span><br><span class="line">    return sum;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><span id="#7"></span></p>
+<h3 id="锁"><a href="#锁" class="headerlink" title="锁"></a>锁</h3><p><a href="/2019/10/14/同步锁总结篇/">同步锁2019总结篇</a></p>
 <p>by xuyuanfa</p>
 
       
@@ -523,6 +524,12 @@ protected Integer compute() {
     
 
     <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/JUC/" rel="tag"># JUC</a>
+          
+        </div>
       
 
       
@@ -641,7 +648,25 @@ protected Integer compute() {
             
 
             
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
 
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">7</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
             
 
           </nav>
